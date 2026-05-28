@@ -7,8 +7,6 @@ from functools import wraps
 from datetime import datetime
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-
-# Wajib untuk Vercel & Neon PostgreSQL
 import psycopg2
 from psycopg2.extras import DictCursor
 
@@ -22,7 +20,6 @@ limiter = Limiter(
 UPLOAD_FOLDER = 'static/uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# [FIX VERCEL 1]: Bypass Read-Only Filesystem
 try:
     if not os.path.exists(UPLOAD_FOLDER):
         os.makedirs(UPLOAD_FOLDER)
@@ -45,7 +42,6 @@ def init_db():
     
     cur.execute('''CREATE TABLE IF NOT EXISTS tenants (
         id SERIAL PRIMARY KEY, nama_toko TEXT, is_active INTEGER DEFAULT 1, created_at TEXT)''')
-
     cur.execute('''CREATE TABLE IF NOT EXISTS donasi_pendaftaran (
         id SERIAL PRIMARY KEY, nama TEXT, email TEXT, whatsapp TEXT, kode_donasi TEXT, 
         status TEXT, nominal INTEGER DEFAULT 0, created_at TEXT)''')
@@ -59,26 +55,22 @@ def init_db():
         id SERIAL PRIMARY KEY, tenant_id INTEGER, sku TEXT, nama TEXT, harga INTEGER, harga_modal INTEGER, 
         kategori TEXT, satuan TEXT, stok INTEGER, stok_min INTEGER, status TEXT, foto TEXT, 
         FOREIGN KEY(tenant_id) REFERENCES tenants(id))''')
-        
     cur.execute('CREATE TABLE IF NOT EXISTS transaksi (id SERIAL PRIMARY KEY, tenant_id INTEGER, tanggal TEXT, total INTEGER)')
-    
     cur.execute('''CREATE TABLE IF NOT EXISTS detail_transaksi (
         id SERIAL PRIMARY KEY, tenant_id INTEGER, transaksi_id INTEGER, produk_id INTEGER, qty INTEGER,
         harga_satuan INTEGER, subtotal INTEGER)''')
-    
     cur.execute('''CREATE TABLE IF NOT EXISTS pengeluaran (
         id SERIAL PRIMARY KEY, tenant_id INTEGER, nama TEXT, kategori TEXT, nominal INTEGER, tanggal TEXT)''')
-    
     cur.execute('''CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY, tenant_id INTEGER, email TEXT UNIQUE, username TEXT UNIQUE, password TEXT, 
         nama TEXT, role TEXT, is_active INTEGER DEFAULT 1)''')
-        
     cur.execute('''CREATE TABLE IF NOT EXISTS pengaturan (
         id SERIAL PRIMARY KEY, tenant_id INTEGER, nama_toko TEXT, kontak TEXT, alamat TEXT, footer TEXT, 
         pajak_pb1 INTEGER, service_charge INTEGER, is_tax_included INTEGER, printer TEXT, is_cash_active INTEGER, is_qris_active INTEGER)''')
     
+    # PERBAIKAN: Menghindari Error Kolom psycopg2
     cur.execute('SELECT COUNT(*) FROM tenants')
-    if cur.fetchone()['count'] == 0:
+    if cur.fetchone()[0] == 0:
         cur.execute('INSERT INTO tenants (nama_toko, created_at) VALUES (%s, %s)', ('KasirinAja HQ', datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
         cur.execute('INSERT INTO users (tenant_id, email, username, password, nama, role) VALUES (%s, %s, %s, %s, %s, %s)', 
                      (1, 'admin@kasirinaja.com', 'admin', generate_password_hash('admin123'), 'Super Admin', 'SuperAdmin'))
@@ -89,13 +81,6 @@ def init_db():
     conn.commit()
     cur.close()
     conn.close()
-
-# [FIX VERCEL 2]: Tangkap Error Timeout saat Cold Start
-try:
-    if os.environ.get('DATABASE_URL'):
-        init_db()
-except Exception as e:
-    print(f"Bypass Init DB di Vercel: {e}")
 
 # ==========================================
 # DEKORATOR & FUNGSI BANTU
@@ -120,9 +105,21 @@ def generate_random_password(length=8):
     return ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(length))
 
 # ==========================================
+# RUTE INSTALASI (KHUSUS VERCEL)
+# ==========================================
+@app.route('/setup')
+def setup():
+    try:
+        init_db()
+        return "<h1>✅ DATABASE BERHASIL DIBUAT!</h1><p>Tabel dan akun SuperAdmin telah diinjeksi ke Neon.tech. Silakan <a href='/login'>klik di sini untuk Login</a>.</p>"
+    except Exception as e:
+        return f"<h1>❌ GAGAL MEMBUAT DATABASE:</h1><p>Error Detail: {str(e)}</p>"
+
+# ==========================================
 # RUTE APLIKASI SAAS
 # ==========================================
-@app.route('/landing')
+# PERBAIKAN: Halaman utama kini adalah Landing Page
+@app.route('/')
 def landing():
     return render_template('landing.html')
 
@@ -132,10 +129,8 @@ def register_donasi():
     data = request.json
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=DictCursor)
-    
     cur.execute('SELECT id FROM users WHERE email = %s', (data.get('email'),))
     if cur.fetchone(): return jsonify({"status": "error", "message": "Email sudah terdaftar!"}), 400
-    
     cur.execute('SELECT id FROM donasi_pendaftaran WHERE kode_donasi = %s', (data.get('kode_donasi'),))
     if cur.fetchone(): return jsonify({"status": "error", "message": "Kode bukti sudah digunakan!"}), 400
 
@@ -155,12 +150,10 @@ def admin_saas():
     cur.execute("SELECT * FROM donasi_pendaftaran WHERE status = 'pending' ORDER BY id DESC")
     pendaftar = cur.fetchall()
     
-    cur.execute('''
-        SELECT t.id as tenant_id, t.nama_toko, t.is_active, t.created_at, u.nama as owner_nama, u.email, u.username, d.nominal 
+    cur.execute('''SELECT t.id as tenant_id, t.nama_toko, t.is_active, t.created_at, u.nama as owner_nama, u.email, u.username, d.nominal 
         FROM tenants t JOIN users u ON t.id = u.tenant_id 
         LEFT JOIN donasi_pendaftaran d ON u.email = d.email
-        WHERE u.role = 'Owner' AND t.id != 1 ORDER BY t.id DESC
-    ''')
+        WHERE u.role = 'Owner' AND t.id != 1 ORDER BY t.id DESC''')
     klien_aktif = cur.fetchall()
     
     cur.execute("SELECT SUM(nominal) as total FROM donasi_pendaftaran WHERE status = 'approved'")
@@ -175,23 +168,19 @@ def verifikasi_akun(donasi_id):
     nominal_masuk = int(request.get_json().get('nominal', 0))
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=DictCursor)
-    
     cur.execute("SELECT * FROM donasi_pendaftaran WHERE id = %s AND status = 'pending'", (donasi_id,))
     donatur = cur.fetchone()
     if not donatur: return jsonify({"status": "error", "message": "Data tidak valid."}), 400
 
     try:
         nama_toko = f"Toko {donatur['nama']}"
-        # RETURNING id digunakan untuk PostgreSQL mendapatkan Insert ID
         cur.execute('INSERT INTO tenants (nama_toko, created_at) VALUES (%s, %s) RETURNING id', (nama_toko, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
         tenant_id = cur.fetchone()['id']
-        
         username = donatur['email'].split('@')[0] + str(random.randint(10, 99))
         password_sementara = generate_random_password()
         
         cur.execute('''INSERT INTO users (tenant_id, email, username, password, nama, role) VALUES (%s, %s, %s, %s, %s, 'Owner')''', 
                     (tenant_id, donatur['email'], username, generate_password_hash(password_sementara), donatur['nama']))
-                    
         cur.execute('''INSERT INTO pengaturan (tenant_id, nama_toko, kontak, alamat, footer, pajak_pb1, service_charge, is_tax_included, printer, is_cash_active, is_qris_active)
                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''', 
                     (tenant_id, nama_toko, donatur['whatsapp'], 'Belum diatur', 'Terima Kasih!\nPowered by KasirinAja', 0, 0, 0, 'BT-Printer-58mm', 1, 1))
@@ -202,8 +191,7 @@ def verifikasi_akun(donasi_id):
     except Exception as e:
         conn.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
-    finally:
-        cur.close(); conn.close()
+    finally: cur.close(); conn.close()
 
 @app.route('/admin_saas/tolak/<int:donasi_id>', methods=['POST'])
 @login_required
@@ -238,50 +226,28 @@ def login():
     error = None
     if request.method == 'POST':
         identifier = request.form['username']
-        conn = get_db_connection()
-        cur = conn.cursor(cursor_factory=DictCursor)
-        cur.execute('SELECT * FROM users WHERE username = %s OR email = %s', (identifier, identifier))
-        user = cur.fetchone()
-        cur.close(); conn.close()
-        
-        if user and user['is_active'] == 1 and check_password_hash(user['password'], request.form['password']):
-            session['user_id'], session['tenant_id'] = user['id'], user['tenant_id']
-            session['username'], session['nama'], session['role'] = user['username'], user['nama'], user['role']
-            return redirect(url_for('kasir'))
-        else: error = "Kredensial salah atau toko diblokir."
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor(cursor_factory=DictCursor)
+            cur.execute('SELECT * FROM users WHERE username = %s OR email = %s', (identifier, identifier))
+            user = cur.fetchone()
+            cur.close(); conn.close()
+            
+            if user and user['is_active'] == 1 and check_password_hash(user['password'], request.form['password']):
+                session['user_id'], session['tenant_id'] = user['id'], user['tenant_id']
+                session['username'], session['nama'], session['role'] = user['username'], user['nama'], user['role']
+                return redirect(url_for('kasir'))
+            else: error = "Kredensial salah atau toko diblokir."
+        except Exception as e:
+            error = f"Error Database. Apakah Anda sudah menjalankan /setup? ({e})"
     return render_template('login.html', error=error)
 
 @app.route('/logout')
 def logout():
     session.clear(); return redirect(url_for('login'))
 
-@app.route('/update_akun', methods=['POST'])
-@login_required
-def update_akun():
-    conn = get_db_connection()
-    try:
-        cur = conn.cursor()
-        cur.execute('UPDATE users SET nama = %s, username = %s WHERE id = %s', (request.form['nama'], request.form['username'], session['user_id']))
-        conn.commit(); session['nama'], session['username'] = request.form['nama'], request.form['username']
-        flash('Profil diperbarui!', 'success')
-    except Exception: flash('Username sudah ada!', 'danger')
-    finally: conn.close()
-    return redirect(request.referrer)
-
-@app.route('/update_password', methods=['POST'])
-@login_required
-def update_password():
-    conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=DictCursor)
-    cur.execute('SELECT password FROM users WHERE id = %s', (session['user_id'],))
-    user = cur.fetchone()
-    if check_password_hash(user['password'], request.form['password_lama']):
-        cur.execute('UPDATE users SET password = %s WHERE id = %s', (generate_password_hash(request.form['password_baru']), session['user_id']))
-        conn.commit(); flash('Password diubah!', 'success'); return redirect(url_for('logout'))
-    else:
-        flash('Password lama salah!', 'danger'); return redirect(request.referrer)
-
-@app.route('/')
+# PERBAIKAN: Mesin Kasir kini berada di rute /pos
+@app.route('/pos')
 @login_required
 def kasir():
     conn = get_db_connection()
@@ -305,7 +271,7 @@ def produk():
                     (session['tenant_id'], request.form['sku'], request.form['nama'], request.form['harga'], request.form.get('harga_modal') or 0, 
                      request.form['kategori'], request.form['satuan'], request.form['stok'], request.form.get('stok_min') or 0, 
                      'Aktif' if 'status' in request.form else 'Nonaktif', foto_name))
-        conn.commit(); flash('Produk berhasil ditambahkan!', 'success'); return redirect(url_for('produk'))
+        conn.commit(); flash('Produk ditambahkan!', 'success'); return redirect(url_for('produk'))
     
     cur.execute('SELECT * FROM produk WHERE tenant_id = %s ORDER BY id DESC', (session['tenant_id'],))
     semua_produk = cur.fetchall()
@@ -393,23 +359,6 @@ def pengaturan():
     cur.close(); conn.close()
     return render_template('pengaturan.html', setting=setting)
 
-@app.route('/cetak_struk/<int:transaksi_id>')
-@login_required
-def cetak_struk(transaksi_id):
-    conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=DictCursor)
-    cur.execute('SELECT * FROM transaksi WHERE id = %s AND tenant_id = %s', (transaksi_id, session['tenant_id']))
-    transaksi = cur.fetchone()
-    if not transaksi: return "Nota Tidak Ditemukan", 404
-    
-    cur.execute('''SELECT dt.*, p.nama FROM detail_transaksi dt JOIN produk p ON dt.produk_id = p.id 
-                   WHERE dt.transaksi_id = %s AND dt.tenant_id = %s''', (transaksi_id, session['tenant_id']))
-    details = cur.fetchall()
-    cur.execute('SELECT * FROM pengaturan WHERE tenant_id = %s', (session['tenant_id'],))
-    setting = cur.fetchone()
-    cur.close(); conn.close()
-    return render_template('struk.html', transaksi=transaksi, details=details, setting=setting)
-
 @app.route('/bayar', methods=['POST'])
 @login_required
 def bayar():
@@ -418,14 +367,12 @@ def bayar():
     keranjang = data.get('keranjang', [])
     tid = session['tenant_id']
     if total < 0 or not keranjang: return jsonify({"status": "error", "message": "Data tidak valid!"}), 400
-    
     conn = get_db_connection()
     try:
         cur = conn.cursor(cursor_factory=DictCursor)
         cur.execute('INSERT INTO transaksi (tenant_id, tanggal, total) VALUES (%s, %s, %s) RETURNING id', 
                     (tid, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), total))
         transaksi_id = cur.fetchone()['id']
-        
         for item in keranjang:
             qty, harga = int(item['qty']), int(item['harga'])
             cur.execute('SELECT stok FROM produk WHERE id = %s AND tenant_id = %s', (item['id'], tid))
@@ -439,41 +386,6 @@ def bayar():
         conn.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
     finally: cur.close(); conn.close()
-
-@app.route('/sync_offline', methods=['POST'])
-@login_required
-def sync_offline():
-    data = request.get_json()
-    tid = session['tenant_id']
-    if not data.get('transactions', []): return jsonify({"status": "success"})
-    conn = get_db_connection()
-    try:
-        cur = conn.cursor(cursor_factory=DictCursor)
-        for trx in data.get('transactions', []):
-            cur.execute('INSERT INTO transaksi (tenant_id, tanggal, total) VALUES (%s, %s, %s) RETURNING id', 
-                        (tid, trx.get('tanggal') or datetime.now().strftime("%Y-%m-%d %H:%M:%S"), int(trx.get('total', 0))))
-            transaksi_id = cur.fetchone()['id']
-            for item in trx.get('keranjang', []):
-                qty, harga = int(item['qty']), int(item['harga'])
-                cur.execute('INSERT INTO detail_transaksi (tenant_id, transaksi_id, produk_id, qty, harga_satuan, subtotal) VALUES (%s, %s, %s, %s, %s, %s)', (tid, transaksi_id, item['id'], qty, harga, qty * harga))
-                cur.execute('UPDATE produk SET stok = stok - %s WHERE id = %s AND tenant_id = %s', (qty, item['id'], tid))
-        conn.commit()
-        return jsonify({"status": "success", "synced_count": len(data.get('transactions', []))})
-    except Exception as e:
-        conn.rollback()
-        return jsonify({"status": "error"}), 500
-    finally: cur.close(); conn.close()
-
-@app.route('/api/pengaturan', methods=['POST'])
-@login_required
-def api_pengaturan():
-    data = request.get_json()
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute('''UPDATE pengaturan SET nama_toko=%s, kontak=%s, alamat=%s, footer=%s, pajak_pb1=%s, service_charge=%s, is_tax_included=%s, printer=%s, is_cash_active=%s, is_qris_active=%s WHERE tenant_id=%s''',
-        (data['nama_toko'], data['kontak'], data['alamat'], data['footer'], data['pajak_pb1'], data['service_charge'], data['is_tax_included'], data['printer'], data['is_cash_active'], data['is_qris_active'], session['tenant_id']))
-    conn.commit(); cur.close(); conn.close()
-    return jsonify({"status": "success"})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
