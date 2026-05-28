@@ -42,33 +42,35 @@ def init_db():
     
     cur.execute('''CREATE TABLE IF NOT EXISTS tenants (
         id SERIAL PRIMARY KEY, nama_toko TEXT, is_active INTEGER DEFAULT 1, created_at TEXT)''')
+
     cur.execute('''CREATE TABLE IF NOT EXISTS donasi_pendaftaran (
         id SERIAL PRIMARY KEY, nama TEXT, email TEXT, whatsapp TEXT, kode_donasi TEXT, 
         status TEXT, nominal INTEGER DEFAULT 0, created_at TEXT)''')
     
-    try:
-        cur.execute('ALTER TABLE donasi_pendaftaran ADD COLUMN nominal INTEGER DEFAULT 0')
-    except Exception:
-        conn.rollback()
+    # BAGIAN TRY-EXCEPT ALTER TABLE SUDAH DIHAPUS DARI SINI
 
     cur.execute('''CREATE TABLE IF NOT EXISTS produk (
         id SERIAL PRIMARY KEY, tenant_id INTEGER, sku TEXT, nama TEXT, harga INTEGER, harga_modal INTEGER, 
         kategori TEXT, satuan TEXT, stok INTEGER, stok_min INTEGER, status TEXT, foto TEXT, 
         FOREIGN KEY(tenant_id) REFERENCES tenants(id))''')
+        
     cur.execute('CREATE TABLE IF NOT EXISTS transaksi (id SERIAL PRIMARY KEY, tenant_id INTEGER, tanggal TEXT, total INTEGER)')
+    
     cur.execute('''CREATE TABLE IF NOT EXISTS detail_transaksi (
         id SERIAL PRIMARY KEY, tenant_id INTEGER, transaksi_id INTEGER, produk_id INTEGER, qty INTEGER,
         harga_satuan INTEGER, subtotal INTEGER)''')
+    
     cur.execute('''CREATE TABLE IF NOT EXISTS pengeluaran (
         id SERIAL PRIMARY KEY, tenant_id INTEGER, nama TEXT, kategori TEXT, nominal INTEGER, tanggal TEXT)''')
+    
     cur.execute('''CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY, tenant_id INTEGER, email TEXT UNIQUE, username TEXT UNIQUE, password TEXT, 
         nama TEXT, role TEXT, is_active INTEGER DEFAULT 1)''')
+        
     cur.execute('''CREATE TABLE IF NOT EXISTS pengaturan (
         id SERIAL PRIMARY KEY, tenant_id INTEGER, nama_toko TEXT, kontak TEXT, alamat TEXT, footer TEXT, 
         pajak_pb1 INTEGER, service_charge INTEGER, is_tax_included INTEGER, printer TEXT, is_cash_active INTEGER, is_qris_active INTEGER)''')
     
-    # PERBAIKAN: Menghindari Error Kolom psycopg2
     cur.execute('SELECT COUNT(*) FROM tenants')
     if cur.fetchone()[0] == 0:
         cur.execute('INSERT INTO tenants (nama_toko, created_at) VALUES (%s, %s)', ('KasirinAja HQ', datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
