@@ -1,0 +1,337 @@
+{% extends 'layout.html' %}
+{% block content %}
+
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+    <div>
+        <h2 class="fw-bold mb-0">Kelola Produk</h2>
+        <p class="text-muted mb-0">Tambah, perbarui, dan pantau ketersediaan stok menu Anda.</p>
+    </div>
+    <button class="btn btn-danger btn-lg fw-bold shadow-sm rounded-pill px-4 d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#modalTambahProduk">
+        <i class="bi bi-plus-lg"></i> Tambah Produk
+    </button>
+</div>
+
+<div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+    
+    <div class="card-header bg-white border-bottom p-4 pb-3">
+        <div class="row align-items-center justify-content-between gap-3 gap-md-0">
+            <div class="col-md-7">
+                <ul class="nav nav-pills custom-pills gap-2" id="productTabs">
+                    <li class="nav-item"><a class="nav-link active rounded-pill px-3 py-2 fw-semibold" href="#">Semua Produk</a></li>
+                    <li class="nav-item"><a class="nav-link text-secondary bg-light rounded-pill px-3 py-2 fw-semibold" href="#">Stok Menipis</a></li>
+                    <li class="nav-item"><a class="nav-link text-secondary bg-light rounded-pill px-3 py-2 fw-semibold" href="#">Habis</a></li>
+                </ul>
+            </div>
+            <div class="col-md-4">
+                <div class="input-group">
+                    <span class="input-group-text bg-light border-end-0 rounded-start-pill ps-3"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" class="form-control bg-light border-start-0 rounded-end-pill py-2" placeholder="Cari nama atau SKU produk...">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" id="tabelProduk">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4" style="width: 50px;">
+                            <input class="form-check-input cursor-pointer shadow-none" type="checkbox" id="checkAll">
+                        </th>
+                        <th style="width: 80px;">Foto</th>
+                        <th>Info Produk</th>
+                        <th>Kategori</th>
+                        <th class="cursor-pointer sortable" onclick="sortTable(4)">Harga Jual <i class="bi bi-arrow-down-up text-muted ms-1 small"></i></th>
+                        <th class="cursor-pointer sortable" onclick="sortTable(5)">Stok <i class="bi bi-arrow-down-up text-muted ms-1 small"></i></th>
+                        <th class="text-end pe-4">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody class="border-top-0">
+                    {% if menu %}
+                        {% for item in menu %}
+                        {% set max_stok_visual = 100 %}
+                        {% set persentase = (item.stok / max_stok_visual) * 100 %}
+                        {% if persentase > 100 %}{% set persentase = 100 %}{% endif %}
+
+                        <tr class="{% if item.status == 'Nonaktif' %}opacity-50{% endif %}">
+                            <td class="ps-4">
+                                <input class="form-check-input cursor-pointer shadow-none item-check" type="checkbox" value="{{ item.id }}">
+                            </td>
+                            <td>
+                                {% if item.foto %}
+                                    <img src="{{ url_for('static', filename='uploads/' ~ item.foto) }}" class="rounded-4 object-fit-cover shadow-sm border" style="width: 50px; height: 50px;" alt="Produk">
+                                {% else %}
+                                    <div class="bg-secondary bg-opacity-10 rounded-4 d-flex justify-content-center align-items-center text-secondary border" style="width: 50px; height: 50px;">
+                                        <i class="bi bi-image fs-5"></i>
+                                    </div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <h6 class="mb-0 fw-bold">
+                                    {{ item.nama }}
+                                    {% if item.status == 'Nonaktif' %}
+                                        <span class="badge bg-secondary ms-1" style="font-size: 0.6rem;">Nonaktif</span>
+                                    {% endif %}
+                                </h6>
+                                <small class="text-muted">SKU: {{ item.sku }}</small>
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary bg-opacity-10 text-secondary border px-2 py-1 rounded-pill">{{ item.kategori }}</span>
+                            </td>
+                            <td class="fw-bold text-dark data-harga" data-value="{{ item.harga }}">
+                                Rp {{ "{:,}".format(item.harga) }} <small class="text-muted fw-normal">/ {{ item.satuan }}</small>
+                            </td>
+                            <td class="data-stok" data-value="{{ item.stok }}">
+                                <div class="d-flex flex-column" style="width: 100px;">
+                                    {% if item.stok <= 0 %}
+                                        <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 py-1 mb-1"><i class="bi bi-x-circle-fill me-1"></i> Habis</span>
+                                        <div class="progress" style="height: 4px;"><div class="progress-bar bg-danger" style="width: 0%"></div></div>
+                                    {% elif item.stok <= 10 %}
+                                        <span class="badge bg-warning bg-opacity-25 text-dark border border-warning border-opacity-50 py-1 mb-1"><i class="bi bi-exclamation-triangle-fill text-warning me-1"></i> {{ item.stok }} Sisa</span>
+                                        <div class="progress" style="height: 4px;"><div class="progress-bar bg-warning" style="width: {{ persentase }}%"></div></div>
+                                    {% else %}
+                                        <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 py-1 mb-1"><i class="bi bi-check-circle-fill me-1"></i> {{ item.stok }} Aman</span>
+                                        <div class="progress" style="height: 4px;"><div class="progress-bar bg-success" style="width: {{ persentase }}%"></div></div>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td class="text-end pe-4">
+                                <div class="d-flex justify-content-end gap-2">
+                                    <button class="btn btn-sm btn-light border text-secondary rounded-3 shadow-sm" title="Edit" 
+                                            onclick="bukaEditModal({{ item.id }}, '{{ item.sku }}', '{{ item.nama }}', {{ item.harga }}, {{ item.stok }}, '{{ item.kategori }}', '{{ item.satuan }}', {{ item.harga_modal }}, {{ item.stok_min }}, '{{ item.status }}')">
+                                        <i class="bi bi-pencil-square"></i>
+                                    </button>
+                                    
+                                    <form action="/hapus_produk/{{ item.id }}" method="POST" class="d-inline" onsubmit="return confirm('PERINGATAN: Apakah Anda yakin ingin menghapus produk {{ item.nama }}? Data yang dihapus tidak bisa dikembalikan.');">
+                                        <button type="submit" class="btn btn-sm btn-light border text-danger rounded-3 shadow-sm" title="Hapus">
+                                            <i class="bi bi-trash3"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center py-5">
+                                <div class="py-4">
+                                    <div class="bg-danger bg-opacity-10 rounded-circle d-inline-flex justify-content-center align-items-center mb-3" style="width: 80px; height: 80px;">
+                                        <i class="bi bi-box-seam text-danger fs-1"></i>
+                                    </div>
+                                    <h5 class="fw-bold text-dark">Belum ada produk</h5>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalTambahProduk" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg"> 
+        <div class="modal-content rounded-4 border-0 shadow">
+            <div class="modal-header border-bottom-0 pb-0 px-4 pt-4">
+                <h5 class="modal-title fw-bold">Tambah Produk Baru</h5>
+                <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form method="POST" action="/produk" enctype="multipart/form-data">
+                    <div class="row g-4">
+                        <div class="col-md-4 d-flex flex-column align-items-center justify-content-center border-end">
+                            <label class="form-label fw-semibold small text-muted mb-3">Foto Produk</label>
+                            <div class="position-relative cursor-pointer">
+                                <img id="previewFoto" src="https://placehold.co/150x150/f8f9fa/a3a3a3?text=Upload\nFoto" class="rounded-4 border shadow-sm object-fit-cover" style="width: 140px; height: 140px;" alt="Preview">
+                                <label for="inputFoto" class="btn btn-danger btn-sm rounded-circle position-absolute bottom-0 end-0 shadow border border-2 border-white cursor-pointer" style="transform: translate(25%, 25%); width: 35px; height: 35px; display: flex; align-items: center; justify-content: center;">
+                                    <i class="bi bi-camera-fill"></i>
+                                </label>
+                                <input type="file" name="foto" id="inputFoto" class="d-none" accept="image/png, image/jpeg" onchange="previewImage(event)">
+                            </div>
+                            <p class="small text-muted mt-3 text-center mb-0">Format: JPG, PNG<br>Maks: 2MB</p>
+                        </div>
+
+                        <div class="col-md-8">
+                            <div class="row g-3">
+                                <div class="col-md-8">
+                                    <label class="form-label fw-semibold small text-muted">Nama Produk</label>
+                                    <input type="text" name="nama" class="form-control rounded-3 bg-light" placeholder="Contoh: Ayam Penyet Sambal Ijo" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label fw-semibold small text-muted">SKU / Barcode</label>
+                                    <input type="text" name="sku" class="form-control rounded-3 bg-light" placeholder="PRD-005" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold small text-muted">Kategori</label>
+                                    <select name="kategori" class="form-select rounded-3 bg-light">
+                                        <option value="Makanan">Makanan</option>
+                                        <option value="Minuman">Minuman</option>
+                                        <option value="Tambahan">Tambahan</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold small text-muted">Satuan</label>
+                                    <select name="satuan" class="form-select rounded-3 bg-light">
+                                        <option value="Porsi">Porsi</option>
+                                        <option value="Cup">Cup</option>
+                                        <option value="Pcs">Pcs / Buah</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12"><hr class="my-1 opacity-25"></div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-muted">Harga Modal (Rp)</label>
+                            <input type="number" name="harga_modal" class="form-control rounded-3 bg-light" placeholder="12000" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-muted">Harga Jual (Rp)</label>
+                            <input type="number" name="harga" class="form-control rounded-3 bg-light border-danger" placeholder="18000" required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-muted">Stok Awal</label>
+                            <input type="number" name="stok" class="form-control rounded-3 bg-light" placeholder="50" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-muted">Peringatan Stok Minimum</label>
+                            <input type="number" name="stok_min" class="form-control rounded-3 bg-light" placeholder="5" required>
+                        </div>
+
+                        <div class="col-12 mt-2">
+                            <div class="form-check form-switch p-3 bg-light rounded-3 d-flex align-items-center justify-content-between border">
+                                <div>
+                                    <label class="form-check-label fw-bold text-dark mb-0" for="statusProduk">Status Produk Aktif</label>
+                                    <div class="small text-muted">Produk akan ditampilkan di halaman kasir jika aktif.</div>
+                                </div>
+                                <input class="form-check-input fs-4 m-0 shadow-none cursor-pointer" type="checkbox" role="switch" name="status" id="statusProduk" checked>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4 pt-3 border-top d-flex gap-2 justify-content-end">
+                        <button type="button" class="btn btn-light rounded-pill px-4 fw-semibold" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" class="btn btn-danger rounded-pill px-5 fw-bold shadow-sm"><i class="bi bi-save me-2"></i> Simpan Produk</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalEditProduk" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg"> 
+        <div class="modal-content rounded-4 border-0 shadow">
+            <div class="modal-header border-bottom-0 pb-0 px-4 pt-4">
+                <h5 class="modal-title fw-bold">Edit Data Produk</h5>
+                <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="formEditProduk" method="POST" action="">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label fw-semibold small text-muted">Nama Produk</label>
+                            <input type="text" id="editNama" name="nama" class="form-control rounded-3 bg-light" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold small text-muted">SKU / Barcode</label>
+                            <input type="text" id="editSku" name="sku" class="form-control rounded-3 bg-light" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-muted">Kategori</label>
+                            <select id="editKategori" name="kategori" class="form-select rounded-3 bg-light">
+                                <option value="Makanan">Makanan</option>
+                                <option value="Minuman">Minuman</option>
+                                <option value="Tambahan">Tambahan</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-muted">Satuan</label>
+                            <select id="editSatuan" name="satuan" class="form-select rounded-3 bg-light">
+                                <option value="Porsi">Porsi</option>
+                                <option value="Cup">Cup</option>
+                                <option value="Pcs">Pcs / Buah</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-muted">Harga Jual (Rp)</label>
+                            <input type="number" id="editHarga" name="harga" class="form-control rounded-3 bg-light border-danger" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-muted">Stok Saat Ini</label>
+                            <input type="number" id="editStok" name="stok" class="form-control rounded-3 bg-light" required>
+                        </div>
+                    </div>
+                    <div class="mt-4 pt-3 border-top d-flex justify-content-end gap-2">
+                        <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" class="btn btn-danger rounded-pill px-5 fw-bold shadow-sm">Simpan Perubahan</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .custom-pills .nav-link.active { background-color: var(--bs-danger) !important; color: white !important; }
+    .sortable:hover { background-color: #f8f9fa; }
+</style>
+
+<script>
+    // Preview Gambar Saat Tambah Produk
+    function previewImage(event) {
+        var reader = new FileReader();
+        reader.onload = function(){
+            var output = document.getElementById('previewFoto');
+            output.src = reader.result;
+        };
+        if(event.target.files[0]) {
+            reader.readAsDataURL(event.target.files[0]);
+        }
+    }
+
+    // Mengisi Modal Edit secara Dinamis
+    function bukaEditModal(id, sku, nama, harga, stok, kategori, satuan, harga_modal, stok_min, status) {
+        document.getElementById('editNama').value = nama;
+        document.getElementById('editSku').value = sku;
+        document.getElementById('editKategori').value = kategori;
+        document.getElementById('editSatuan').value = satuan;
+        document.getElementById('editHarga').value = harga;
+        document.getElementById('editStok').value = stok;
+        
+        // Atur agar form dikirim ke route id yang tepat
+        document.getElementById('formEditProduk').action = '/edit_produk/' + id;
+        
+        new bootstrap.Modal(document.getElementById('modalEditProduk')).show();
+    }
+
+    // Fungsi Sortir Kolom Tabel
+    let sortDirection = false;
+    function sortTable(columnIndex) {
+        const table = document.getElementById("tabelProduk");
+        const tbody = table.querySelector("tbody");
+        const rows = Array.from(tbody.querySelectorAll("tr"));
+        
+        if(rows.length === 0 || rows[0].querySelector('td').colSpan === 7) return;
+
+        sortDirection = !sortDirection;
+
+        rows.sort((a, b) => {
+            const cellA = a.querySelectorAll("td")[columnIndex];
+            const cellB = b.querySelectorAll("td")[columnIndex];
+            
+            const valA = parseFloat(cellA.getAttribute('data-value'));
+            const valB = parseFloat(cellB.getAttribute('data-value'));
+
+            if (valA < valB) return sortDirection ? -1 : 1;
+            if (valA > valB) return sortDirection ? 1 : -1;
+            return 0;
+        });
+
+        tbody.innerHTML = "";
+        rows.forEach(row => tbody.appendChild(row));
+    }
+</script>
+{% endblock %}

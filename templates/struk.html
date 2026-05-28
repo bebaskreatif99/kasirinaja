@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Struk #TRX-00{{ transaksi.id }}</title>
+    <style>
+        /* Pengaturan Kertas Ukuran Thermal Kasir Standar 58mm */
+        @page {
+            size: 58mm auto;
+            margin: 0;
+        }
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            width: 52mm;
+            margin: 0 auto;
+            padding: 12px 2px;
+            font-size: 11px;
+            color: #000;
+            line-height: 1.3;
+        }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .bold { font-weight: bold; }
+        .divider { border-top: 1px dashed #000; margin: 6px 0; }
+        
+        /* Layout Tabel Struk */
+        .item-row { display: table; width: 100%; margin-bottom: 3px; }
+        .item-name { display: table-cell; width: 55%; word-break: break-word; }
+        .item-qty { display: table-cell; width: 15%; text-align: center; }
+        .item-total { display: table-cell; width: 30%; text-align: right; }
+        
+        .flex-space { display: flex; justify-content: space-between; }
+        .meta-info { font-size: 10px; margin-bottom: 4px; }
+    </style>
+</head>
+<body>
+
+    <div class="text-center">
+        <span class="bold" style="font-size: 13px;">{{ setting.nama_toko }}</span><br>
+        <span style="font-size: 9px; display: block; margin-top: 2px;">{{ setting.alamat }}</span><br>
+        <span style="font-size: 9px;">Telp/WA: {{ setting.kontak }}</span>
+    </div>
+    
+    <div class="divider"></div>
+    
+    <div class="meta-info">
+        <div>No. Nota : #TRX-00{{ transaksi.id }}</div>
+        <div>Waktu    : {{ transaksi.tanggal }}</div>
+        <div>Kasir    : {{ session.get('nama', 'Operator') }}</div>
+    </div>
+    
+    <div class="divider"></div>
+    
+    <div style="width: 100%;">
+        {% for item in details %}
+        <div class="item-row">
+            <div class="item-name">{{ item.nama }}</div>
+            <div class="item-qty">x{{ item.qty }}</div>
+            <div class="item-total">Rp{{ "{:,}".format(item.subtotal) }}</div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <div class="divider"></div>
+    
+    <div class="flex-space bold" style="font-size: 12px; margin-top: 2px;">
+        <span>TOTAL AKHIR :</span>
+        <span>Rp{{ "{:,}".format(transaksi.total) }}</span>
+    </div>
+    
+    <div class="divider"></div>
+    
+    <div class="text-center" style="white-space: pre-line; font-size: 9px; margin-top: 8px; opacity: 0.8;">
+        {{ setting.footer }}
+    </div>
+
+    <script>
+        window.onload = function() {
+            // Memanggil dialog print bawaan browser secara otomatis
+            window.print();
+            
+            // Jeda 500ms agar dialog print sempat muncul, lalu tab struk akan menutup otomatis
+            setTimeout(function() {
+                window.close();
+            }, 500);
+        }
+    </script>
+</body>
+</html>

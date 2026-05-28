@@ -1,0 +1,282 @@
+{% extends 'layout.html' %}
+{% block content %}
+
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+    <div>
+        <h2 class="fw-bold mb-0">Panel SuperAdmin SaaS 👑</h2>
+        <p class="text-muted mb-0">Kelola pendaftaran klien, verifikasi donasi, dan aktivasi toko baru.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <div class="input-group shadow-sm rounded-pill overflow-hidden border bg-white" style="width: 300px;">
+            <span class="input-group-text bg-transparent border-0 ps-4"><i class="bi bi-search text-muted"></i></span>
+            <input type="text" id="searchKlien" class="form-control border-0 bg-transparent shadow-none" placeholder="Cari klien / kode bukti..." onkeyup="cariKlien()">
+        </div>
+        <a href="/landing" target="_blank" class="btn btn-outline-danger fw-bold rounded-pill shadow-sm d-flex align-items-center"><i class="bi bi-box-arrow-up-right me-2"></i>Landing Page</a>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm rounded-4 bg-white border-start border-4 border-warning h-100">
+            <div class="card-body p-4">
+                <h6 class="text-muted fw-bold mb-1">Menunggu Verifikasi</h6>
+                <h3 class="fw-black text-dark mb-0">{{ pendaftar | length }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm rounded-4 bg-white border-start border-4 border-primary h-100">
+            <div class="card-body p-4">
+                <h6 class="text-muted fw-bold mb-1">Klien Toko Aktif</h6>
+                <h3 class="fw-black text-dark mb-0">{{ klien | length }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm rounded-4 bg-white border-start border-4 border-success h-100">
+            <div class="card-body p-4">
+                <h6 class="text-muted fw-bold mb-1">Total Pendapatan (Donasi)</h6>
+                <h3 class="fw-black text-success mb-0">Rp {{ "{:,}".format(total_pendapatan) }}</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<ul class="nav nav-pills custom-pills mb-4 gap-2 border-bottom pb-3" id="adminTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active rounded-pill px-4 py-2 fw-bold shadow-sm" data-bs-toggle="pill" data-bs-target="#tab-antrean" type="button"><i class="bi bi-hourglass-split me-1"></i> Antrean Pendaftaran</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link bg-white border text-secondary rounded-pill px-4 py-2 fw-bold shadow-sm" data-bs-toggle="pill" data-bs-target="#tab-klien" type="button" onclick="this.classList.remove('bg-white','text-secondary','border')"><i class="bi bi-shop me-1"></i> Daftar Klien Aktif</button>
+    </li>
+</ul>
+
+<div class="tab-content" id="adminTabsContent">
+    <div class="tab-pane fade show active" id="tab-antrean" role="tabpanel">
+        <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0" id="tableAntrean">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4">Waktu Daftar</th>
+                                <th>Info Klien</th>
+                                <th>Kode Bukti (SWR/TRK)</th>
+                                <th class="text-end pe-4">Aksi Eksekusi</th>
+                            </tr>
+                        </thead>
+                        <tbody class="border-top-0">
+                            {% for p in pendaftar %}
+                            <tr class="data-row">
+                                <td class="ps-4 text-muted small">{{ p.created_at }}</td>
+                                <td>
+                                    <strong class="text-dark d-block search-target">{{ p.nama }}</strong>
+                                    <div class="small"><i class="bi bi-whatsapp text-success me-1"></i> <a href="https://wa.me/{{ p.whatsapp }}" target="_blank" class="text-decoration-none text-success">{{ p.whatsapp }}</a></div>
+                                </td>
+                                <td><span class="badge bg-light text-dark border px-3 py-2 search-target" style="font-family: monospace;">{{ p.kode_donasi }}</span></td>
+                                <td class="text-end pe-4">
+                                    <div class="d-flex justify-content-end gap-2">
+                                        <button class="btn btn-sm btn-outline-secondary fw-bold rounded-pill px-3" onclick="tampilkanDetail('{{ p.nama }}', '{{ p.email }}', '{{ p.whatsapp }}', '{{ p.kode_donasi }}', '{{ p.created_at }}')"><i class="bi bi-eye"></i> Detail</button>
+                                        <button class="btn btn-sm btn-outline-danger fw-bold rounded-pill px-3" onclick="tolakKlien({{ p.id }}, '{{ p.nama }}')" id="btn-tolak-{{ p.id }}"><i class="bi bi-x-circle"></i> Tolak</button>
+                                        <button class="btn btn-sm btn-success fw-bold rounded-pill shadow-sm px-3" onclick="verifikasiAkun({{ p.id }}, '{{ p.nama }}')" id="btn-verif-{{ p.id }}"><i class="bi bi-magic me-1"></i> Buat Toko</button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="4" class="text-center py-5 text-muted">Hore! Antrean bersih. Belum ada pendaftar baru.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="tab-pane fade" id="tab-klien" role="tabpanel">
+        <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0" id="tableKlien">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4">Tenant / Toko</th>
+                                <th>Pemilik (Owner)</th>
+                                <th>Donasi</th>
+                                <th>Status Akses</th>
+                                <th class="text-end pe-4">Manajemen</th>
+                            </tr>
+                        </thead>
+                        <tbody class="border-top-0">
+                            {% for k in klien %}
+                            <tr class="data-row">
+                                <td class="ps-4">
+                                    <strong class="text-dark d-block search-target">{{ k.nama_toko }}</strong>
+                                    <small class="text-muted">Sejak: {{ k.created_at[:10] }}</small>
+                                </td>
+                                <td>
+                                    <div class="fw-semibold search-target">{{ k.owner_nama }}</div>
+                                    <div class="small text-muted"><i class="bi bi-envelope"></i> {{ k.email }}</div>
+                                </td>
+                                <td class="fw-bold text-success">Rp {{ "{:,}".format(k.nominal or 0) }}</td>
+                                <td>
+                                    <span class="badge {% if k.is_active %}bg-success bg-opacity-10 text-success border border-success{% else %}bg-danger bg-opacity-10 text-danger border border-danger{% endif %} px-3 py-2 rounded-pill status-badge-{{ k.tenant_id }}">
+                                        {% if k.is_active %}<i class="bi bi-check-circle-fill me-1"></i> Aktif{% else %}<i class="bi bi-slash-circle me-1"></i> Diblokir{% endif %}
+                                    </span>
+                                </td>
+                                <td class="text-end pe-4">
+                                    <button class="btn btn-sm {% if k.is_active %}btn-outline-danger{% else %}btn-outline-success{% endif %} fw-bold rounded-pill px-3 btn-toggle-{{ k.tenant_id }}" onclick="toggleBlokir({{ k.tenant_id }}, '{{ k.nama_toko }}')">
+                                        {% if k.is_active %}<i class="bi bi-lock-fill me-1"></i> Blokir{% else %}<i class="bi bi-unlock-fill me-1"></i> Buka Blokir{% endif %}
+                                    </button>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="5" class="text-center py-5 text-muted">Belum ada klien yang aktif.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalKredensial" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow-lg p-3">
+            <div class="modal-header border-0">
+                <h5 class="modal-title fw-bold text-success"><i class="bi bi-check-circle-fill me-2"></i>Toko Berhasil Dibuat!</h5>
+                <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" onclick="location.reload()"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small">Silakan salin Username & Password sementara ini dan kirimkan ke klien.</p>
+                <div class="bg-light p-4 rounded-4 border shadow-sm mt-3"><pre id="kredensialText" class="mb-0 fw-bold" style="white-space: pre-wrap; font-family: monospace;"></pre></div>
+                <button class="btn btn-primary w-100 fw-bold rounded-pill mt-4 py-2 shadow-sm" onclick="copyKredensial()"><i class="bi bi-clipboard me-2"></i> Salin Teks</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalDetail" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow-lg">
+            <div class="modal-header border-bottom px-4 pt-4">
+                <h5 class="modal-title fw-bold"><i class="bi bi-person-lines-fill text-primary me-2"></i>Detail Pendaftar</h5>
+                <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item px-0"><strong>Nama Klien:</strong> <br><span id="detNama" class="text-muted"></span></li>
+                    <li class="list-group-item px-0"><strong>Email:</strong> <br><span id="detEmail" class="text-muted"></span></li>
+                    <li class="list-group-item px-0"><strong>WhatsApp:</strong> <br><span id="detWa" class="text-muted"></span></li>
+                    <li class="list-group-item px-0"><strong>Kode Bukti Transfer:</strong> <br><span id="detKode" class="badge bg-light text-dark border fs-6 mt-1" style="font-family: monospace;"></span></li>
+                    <li class="list-group-item px-0 border-bottom-0"><strong>Waktu Pendaftaran:</strong> <br><span id="detWaktu" class="text-muted"></span></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .custom-pills .nav-link.active { background-color: var(--bs-danger) !important; color: white !important; }
+</style>
+
+<script>
+    // --- FITUR PENCARIAN CERDAS ---
+    function cariKlien() {
+        let input = document.getElementById('searchKlien').value.toLowerCase();
+        let rows = document.querySelectorAll('.data-row');
+        rows.forEach(row => {
+            let text = Array.from(row.querySelectorAll('.search-target')).map(el => el.innerText.toLowerCase()).join(' ');
+            row.style.display = text.includes(input) ? '' : 'none';
+        });
+    }
+
+    // --- FITUR DETAIL MODAL ---
+    function tampilkanDetail(nama, email, wa, kode, waktu) {
+        document.getElementById('detNama').innerText = nama;
+        document.getElementById('detEmail').innerText = email;
+        document.getElementById('detWa').innerText = wa;
+        document.getElementById('detKode').innerText = kode;
+        document.getElementById('detWaktu').innerText = waktu;
+        new bootstrap.Modal(document.getElementById('modalDetail')).show();
+    }
+
+    // --- FITUR BUAT TOKO (DENGAN NOMINAL) ---
+    async function verifikasiAkun(donasiId, namaKlien) {
+        // Tanyakan nominal dukungan yang dikirim klien
+        let nominalInput = prompt(`Berapa nominal dukungan (Rp) yang diberikan oleh ${namaKlien} dari Saweria/Trakteer?\n(Kosongkan atau isi 0 jika gratis)`, "0");
+        if (nominalInput === null) return; // Batal ditekan
+        let nominal = parseInt(nominalInput.replace(/\D/g, '')) || 0;
+
+        const btn = document.getElementById(`btn-verif-${donasiId}`);
+        const originalText = btn.innerHTML;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Proses...`; btn.disabled = true;
+
+        try {
+            const res = await fetch(`/admin_saas/verifikasi/${donasiId}`, { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nominal: nominal })
+            });
+            const data = await res.json();
+            
+            if (data.status === 'success') {
+                document.getElementById('kredensialText').innerText = data.message;
+                new bootstrap.Modal(document.getElementById('modalKredensial')).show();
+            } else {
+                alert("Gagal: " + data.message);
+                btn.innerHTML = originalText; btn.disabled = false;
+            }
+        } catch(e) {
+            alert("Kesalahan jaringan."); btn.innerHTML = originalText; btn.disabled = false;
+        }
+    }
+
+    // --- FITUR TOLAK ANTREAN ---
+    async function tolakKlien(donasiId, namaKlien) {
+        if(!confirm(`TOLAK: Anda yakin kode bukti dari ${namaKlien} tidak valid/palsu? Antrean akan dihapus.`)) return;
+        
+        const btn = document.getElementById(`btn-tolak-${donasiId}`);
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span>`; btn.disabled = true;
+
+        try {
+            const res = await fetch(`/admin_saas/tolak/${donasiId}`, { method: 'POST' });
+            if(res.ok) location.reload();
+        } catch(e) { alert("Gagal menolak data."); btn.disabled = false; }
+    }
+
+    // --- FITUR SUSPEND / BLOKIR TOKO ---
+    async function toggleBlokir(tenantId, namaToko) {
+        if(!confirm(`Apakah Anda yakin ingin mengubah status akses untuk ${namaToko}?`)) return;
+        
+        const btn = document.querySelector(`.btn-toggle-${tenantId}`);
+        btn.disabled = true;
+
+        try {
+            const res = await fetch(`/admin_saas/toggle_blokir/${tenantId}`, { method: 'POST' });
+            const data = await res.json();
+            
+            if(data.status === 'success') {
+                let badge = document.querySelector(`.status-badge-${tenantId}`);
+                if(data.new_status === 1) {
+                    badge.className = `badge bg-success bg-opacity-10 text-success border border-success px-3 py-2 rounded-pill status-badge-${tenantId}`;
+                    badge.innerHTML = `<i class="bi bi-check-circle-fill me-1"></i> Aktif`;
+                    btn.className = `btn btn-sm btn-outline-danger fw-bold rounded-pill px-3 btn-toggle-${tenantId}`;
+                    btn.innerHTML = `<i class="bi bi-lock-fill me-1"></i> Blokir`;
+                } else {
+                    badge.className = `badge bg-danger bg-opacity-10 text-danger border border-danger px-3 py-2 rounded-pill status-badge-${tenantId}`;
+                    badge.innerHTML = `<i class="bi bi-slash-circle me-1"></i> Diblokir`;
+                    btn.className = `btn btn-sm btn-outline-success fw-bold rounded-pill px-3 btn-toggle-${tenantId}`;
+                    btn.innerHTML = `<i class="bi bi-unlock-fill me-1"></i> Buka Blokir`;
+                }
+            } else { alert("Gagal mengubah status: " + data.message); }
+        } catch(e) { alert("Kesalahan jaringan."); }
+        finally { btn.disabled = false; }
+    }
+
+    function copyKredensial() {
+        navigator.clipboard.writeText(document.getElementById('kredensialText').innerText).then(() => alert("Kredensial disalin!"));
+    }
+</script>
+
+{% endblock %}

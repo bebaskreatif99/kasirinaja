@@ -1,0 +1,419 @@
+{% extends 'layout.html' %}
+{% block content %}
+
+<style>
+    /* OPTIMASI TOUCHSCREEN & ZERO-BOUNCE */
+    :root { --touch-target: 48px; }
+    body { overscroll-behavior-y: none; touch-action: manipulation; background-color: #f4f7f6; }
+    .pos-layout { height: calc(100vh - 70px); overflow: hidden; }
+    @media (max-width: 991px) { .pos-layout { height: calc(100vh - 120px); } }
+
+    .menu-area { height: 100%; overflow-y: auto; padding-bottom: 120px; -webkit-overflow-scrolling: touch; }
+    .hide-scroll::-webkit-scrollbar { display: none; }
+
+    .btn-touch { 
+        min-width: var(--touch-target); min-height: var(--touch-target); 
+        display: flex; align-items: center; justify-content: center;
+        border-radius: 12px; font-weight: bold; transition: 0.1s; user-select: none;
+    }
+    .btn-touch:active { transform: scale(0.92); opacity: 0.8; }
+    .card-menu { cursor: pointer; border: none; border-radius: 20px; transition: transform 0.1s; overflow: hidden; }
+    .card-menu:active { transform: scale(0.96); }
+
+    .numpad-btn { 
+        min-height: 60px; font-size: 1.5rem; font-weight: bold; 
+        border-radius: 16px; border: 1px solid #eee; background: #f8f9fa;
+    }
+    .numpad-btn:active { background: #e2e6ea; transform: scale(0.95); }
+
+    #offlineBanner { z-index: 9999; top: -50px; transition: 0.4s ease; }
+    #offlineBanner.show { top: 0; }
+    .fade-in { animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+
+<div id="offlineBanner" class="position-fixed w-100 bg-warning text-dark text-center fw-bold py-2 shadow-lg">
+    <i class="bi bi-wifi-off me-2"></i> Mode Offline Aktif. Transaksi disimpan lokal & akan sinkron otomatis.
+</div>
+
+<div class="row g-0 pos-layout w-100 m-0">
+    <div class="col-12 col-lg-8 px-3 px-lg-4 pt-3 menu-area hide-scroll">
+        <div class="d-flex gap-2 mb-3">
+            <div class="input-group shadow-sm rounded-pill overflow-hidden border-0 bg-white flex-grow-1">
+                <span class="input-group-text bg-white border-0 ps-4"><i class="bi bi-search text-muted"></i></span>
+                <input type="text" id="inputPencarian" class="form-control border-0 py-3 shadow-none fw-semibold" placeholder="Cari menu ayam, kopi, dsb..." onkeyup="UI.filterKatalog()">
+            </div>
+            <button id="btnBT" class="btn btn-white bg-white rounded-circle shadow-sm flex-shrink-0" style="width: 56px;" onclick="PrinterService.connect()" title="Koneksi Printer Bluetooth">
+                <i class="bi bi-bluetooth text-primary fs-4"></i>
+            </button>
+        </div>
+
+        <div class="d-flex overflow-auto hide-scroll gap-2 mb-4 pb-2">
+            <button class="btn btn-danger rounded-pill px-4 fw-bold flex-shrink-0 shadow-sm btn-touch" onclick="UI.filterKategori('Semua', this)">🔥 Semua</button>
+            <button class="btn btn-white bg-white border-0 rounded-pill px-4 fw-bold flex-shrink-0 text-secondary shadow-sm btn-touch" onclick="UI.filterKategori('Makanan', this)">🍗 Makanan</button>
+            <button class="btn btn-white bg-white border-0 rounded-pill px-4 fw-bold flex-shrink-0 text-secondary shadow-sm btn-touch" onclick="UI.filterKategori('Minuman', this)">🥤 Minuman</button>
+            <button class="btn btn-white bg-white border-0 rounded-pill px-4 fw-bold flex-shrink-0 text-secondary shadow-sm btn-touch" onclick="UI.filterKategori('Tambahan', this)">🍚 Lainnya</button>
+        </div>
+
+        <div class="row g-3" id="katalogMenu">
+            {% for item in menu %}
+            <div class="col-6 col-md-4 col-xl-3 item-menu" data-nama="{{ item.nama|lower }}" data-kategori="{{ item.kategori }}"> 
+                <div class="card card-menu h-100 shadow-sm" onclick="State.addItem({{ item.id }}, '{{ item.nama }}', {{ item.harga }}, {{ item.stok }})">
+                    <div class="position-relative w-100 bg-light" style="padding-top: 100%;">
+                        {% if item.foto %}
+                        <img src="{{ url_for('static', filename='uploads/' ~ item.foto) }}" class="position-absolute top-0 start-0 w-100 h-100 object-fit-cover" alt="{{ item.nama }}">
+                        {% else %}
+                        <div class="position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center opacity-25"><i class="bi bi-image fs-1"></i></div>
+                        {% endif %}
+                    </div>
+                    <div class="card-body p-3 text-center bg-white">
+                        {% if item.stok <= item.stok_min %}
+                            <span class="badge rounded-pill bg-warning text-dark mb-1">Sisa {{ item.stok }}</span>
+                        {% endif %}
+                        <h6 class="fw-bold mb-1 text-dark text-truncate">{{ item.nama }}</h6>
+                        <span class="text-danger fw-bold">Rp {{ "{:,}".format(item.harga) }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="col-lg-4 d-none d-lg-flex bg-white border-start shadow-sm flex-column h-100 position-relative">
+        <div class="p-3 border-bottom d-flex justify-content-between align-items-center" style="min-height: 70px;">
+            <h5 class="mb-0 fw-bold"><i class="bi bi-bag-heart text-danger me-2"></i>Keranjang</h5>
+            <button class="btn btn-sm btn-light rounded-pill px-3 fw-bold text-muted" onclick="State.clearCart()">Kosongkan</button>
+        </div>
+        
+        <div class="cart-area flex-grow-1 overflow-auto p-3 bg-light" id="area-keranjang-desktop"></div>
+
+        <div class="p-4 bg-white border-top shadow-lg">
+            <div class="d-flex justify-content-between mb-2">
+                <span class="text-muted fw-semibold">Subtotal</span>
+                <span class="fw-bold" id="cart-subtotal">Rp 0</span>
+            </div>
+            <div class="d-flex justify-content-between mb-3 pb-3 border-bottom border-dashed">
+                <span class="text-muted fw-semibold">Pajak & Biaya</span>
+                <span class="fw-bold text-primary" id="cart-tax">Rp 0</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-end mb-4">
+                <span class="text-muted fw-bold">Total Tagihan</span>
+                <h2 class="fw-black text-danger mb-0" id="cart-total">Rp 0</h2>
+            </div>
+            <button class="btn btn-success w-100 fw-bold rounded-4 shadow-sm py-3 fs-5 btn-touch" onclick="UI.openPayment()">PROSES PEMBAYARAN</button>
+        </div>
+    </div>
+</div>
+
+<button class="btn btn-danger rounded-circle shadow-lg position-fixed d-lg-none btn-touch" style="bottom: 25px; right: 25px; width: 70px; height: 70px; z-index: 1040;" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">
+    <i class="bi bi-cart-fill fs-2"></i>
+    <span id="cart-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-dark border border-white">0</span>
+</button>
+
+<div class="offcanvas offcanvas-bottom d-lg-none rounded-top-5 shadow-lg" tabindex="-1" id="cartOffcanvas" style="height: 85vh;">
+    <div class="offcanvas-header border-bottom py-3">
+        <h5 class="offcanvas-title fw-bold">Rincian Pesanan</h5>
+        <button type="button" class="btn-close shadow-none" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body p-3 bg-light" id="area-keranjang-mobile"></div>
+    <div class="p-4 bg-white border-top">
+        <div class="d-flex justify-content-between mb-3">
+            <span class="text-muted fw-bold">Total Tagihan</span>
+            <h3 class="fw-black text-danger mb-0" id="cart-total-mobile">Rp 0</h3>
+        </div>
+        <button class="btn btn-success w-100 fw-bold rounded-pill py-3 fs-5" onclick="UI.openPayment()">BAYAR SEKARANG</button>
+    </div>
+</div>
+
+<div class="modal fade" id="modalPembayaran" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content border-0 rounded-5 shadow-lg overflow-hidden">
+            <div class="modal-body p-0 row g-0">
+                
+                <div class="col-md-4 bg-danger p-4 p-md-5 text-white d-flex flex-column justify-content-between">
+                    <div>
+                        <button type="button" class="btn-close btn-close-white mb-4" data-bs-dismiss="modal"></button>
+                        <h6 class="opacity-75 fw-bold text-uppercase mb-1">Total Tagihan</h6>
+                        <h1 class="display-4 fw-black mb-4" id="pay-total-display">Rp 0</h1>
+                        
+                        <div class="bg-white bg-opacity-10 p-3 rounded-4 border border-white border-opacity-25 mb-3">
+                            <span class="d-block small opacity-75 mb-1">Nominal Diterima:</span>
+                            <h3 class="fw-bold mb-0" id="pay-received-display">Rp 0</h3>
+                        </div>
+                    </div>
+                    <div class="bg-white text-dark p-4 rounded-4 shadow-sm mt-3">
+                        <span class="d-block small text-muted fw-bold mb-1">Kembalian:</span>
+                        <h3 class="fw-black mb-0 text-success" id="pay-change-display">Rp 0</h3>
+                    </div>
+                </div>
+
+                <div class="col-md-8 p-4 p-md-5 bg-white d-flex flex-column justify-content-between">
+                    <div>
+                        <h6 class="fw-bold text-muted mb-3">Pilih Metode Pembayaran</h6>
+                        
+                        <div class="d-flex gap-2 mb-4">
+                            {% if setting and setting.is_cash_active %}
+                            <input type="radio" class="btn-check" name="metodeBayar" id="btnTunai" value="Tunai" checked onchange="UI.toggleMetode()">
+                            <label class="btn btn-outline-danger fw-bold flex-grow-1 py-3 rounded-4 shadow-sm" for="btnTunai"><i class="bi bi-cash-stack fs-5 me-2"></i> TUNAI</label>
+                            {% endif %}
+
+                            {% if setting and setting.is_qris_active %}
+                            <input type="radio" class="btn-check" name="metodeBayar" id="btnQris" value="QRIS" {% if not setting.is_cash_active %}checked{% endif %} onchange="UI.toggleMetode()">
+                            <label class="btn btn-outline-primary fw-bold flex-grow-1 py-3 rounded-4 shadow-sm" for="btnQris"><i class="bi bi-qr-code-scan fs-5 me-2"></i> QRIS</label>
+                            {% endif %}
+                        </div>
+
+                        <div id="panelNumpad">
+                            <div class="row g-2 mb-3">
+                                <div class="col-3"><button class="btn btn-warning w-100 fw-bold py-3 rounded-4 shadow-sm" onclick="State.setPay(State.totalFinal)">PAS</button></div>
+                                <div class="col-3"><button class="btn btn-outline-dark w-100 fw-bold py-3 rounded-4 shadow-sm" onclick="State.addPay(20000)">20K</button></div>
+                                <div class="col-3"><button class="btn btn-outline-dark w-100 fw-bold py-3 rounded-4 shadow-sm" onclick="State.addPay(50000)">50K</button></div>
+                                <div class="col-3"><button class="btn btn-outline-dark w-100 fw-bold py-3 rounded-4 shadow-sm" onclick="State.addPay(100000)">100K</button></div>
+                            </div>
+                            <div class="row g-2 mb-4">
+                                {% for n in [1,2,3,4,5,6,7,8,9] %}
+                                <div class="col-4"><button class="numpad-btn w-100" onclick="State.inputNumpad({{n}})">{{n}}</button></div>
+                                {% endfor %}
+                                <div class="col-4"><button class="numpad-btn w-100 text-danger" onclick="State.clearNumpad()">C</button></div>
+                                <div class="col-4"><button class="numpad-btn w-100" onclick="State.inputNumpad(0)">0</button></div>
+                                <div class="col-4"><button class="numpad-btn w-100" onclick="State.inputNumpad('000')">000</button></div>
+                            </div>
+                        </div>
+
+                        <div id="panelQris" class="d-none flex-column align-items-center justify-content-center py-5 text-center">
+                            <i class="bi bi-qr-code fs-1 text-primary mb-3" style="font-size: 4rem !important;"></i>
+                            <h4 class="fw-bold">Menunggu Pembayaran QRIS</h4>
+                            <p class="text-muted">Arahkan pelanggan untuk melakukan scan barcode di kasir. Pastikan dana sudah masuk ke rekening sebelum menyelesaikan.</p>
+                        </div>
+                    </div>
+
+                    <button id="btnFinalize" class="btn btn-success w-100 py-3 rounded-pill fw-black fs-4 shadow-lg mt-auto" onclick="API.submit()">
+                        SELESAIKAN TRANSAKSI <i class="bi bi-arrow-right-circle-fill ms-2"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalSuccess" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 rounded-5 shadow-lg p-4 text-center">
+            <div class="mb-3"><i class="bi bi-check-circle-fill text-success" style="font-size: 5rem;"></i></div>
+            <h3 class="fw-black mb-1">Berhasil!</h3>
+            <p class="text-muted small mb-4">Transaksi telah dibukukan.</p>
+            <div class="d-grid gap-2">
+                <button class="btn btn-primary fw-bold py-3 rounded-pill" onclick="PrinterService.print()"><i class="bi bi-printer me-2"></i> Cetak Struk</button>
+                <button class="btn btn-light fw-bold py-3 rounded-pill border" onclick="location.reload()">Transaksi Baru</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ==========================================
+    // 1. STATE MANAGEMENT & CALCULATIONS
+    // ==========================================
+    const SETTINGS = {
+        taxRate: {{ setting.pajak_pb1 | default(0) }} / 100,
+        serviceRate: {{ setting.service_charge | default(0) }} / 100
+    };
+
+    const formatCurr = (n) => 'Rp ' + Math.round(n).toLocaleString('id-ID');
+
+    const State = {
+        cart: [], subtotal: 0, tax: 0, totalFinal: 0, received: 0,
+        isProcessing: false, lastTrxId: null,
+
+        addItem(id, nama, harga, stok) {
+            let item = this.cart.find(i => i.id === id);
+            if(item) {
+                if(item.qty >= stok) return alert("Stok habis!");
+                item.qty++;
+            } else {
+                if(stok < 1) return alert("Stok habis!");
+                this.cart.push({ id, nama, harga: parseInt(harga), qty: 1, stokMax: stok });
+            }
+            this.sync();
+        },
+        removeItem(id) {
+            let idx = this.cart.findIndex(i => i.id === id);
+            if(idx !== -1) {
+                this.cart[idx].qty--;
+                if(this.cart[idx].qty === 0) this.cart.splice(idx, 1);
+            }
+            this.sync();
+        },
+        clearCart() { if(confirm('Hapus seluruh keranjang?')) { this.cart = []; this.sync(); } },
+        
+        sync() {
+            this.subtotal = this.cart.reduce((s, i) => s + (i.harga * i.qty), 0);
+            this.tax = Math.round(this.subtotal * (SETTINGS.taxRate + SETTINGS.serviceRate));
+            this.totalFinal = this.subtotal + this.tax;
+            UI.render();
+        },
+
+        inputNumpad(v) { 
+            this.received = this.received === 0 ? parseInt(v) : parseInt(this.received.toString() + v.toString());
+            UI.updatePayment();
+        },
+        addPay(v) { this.received += v; UI.updatePayment(); },
+        setPay(v) { this.received = v; UI.updatePayment(); },
+        clearNumpad() { this.received = 0; UI.updatePayment(); }
+    };
+
+    // ==========================================
+    // 2. UI CONTROLLER (DOM RENDERING)
+    // ==========================================
+    const UI = {
+        render() {
+            const html = !State.cart.length ? `<div class="text-center py-5 opacity-50"><i class="bi bi-cart-x fs-1"></i><p>Keranjang kosong</p></div>` 
+                : State.cart.map(i => `
+                <div class="bg-white p-3 rounded-4 shadow-sm mb-2 fade-in">
+                    <div class="d-flex justify-content-between mb-2">
+                        <strong class="text-dark">${i.nama}</strong>
+                        <span class="fw-bold text-danger">${formatCurr(i.harga * i.qty)}</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="text-muted">@${formatCurr(i.harga)}</small>
+                        <div class="d-flex align-items-center gap-2">
+                            <button class="btn btn-light btn-sm btn-touch" onclick="State.removeItem(${i.id})">-</button>
+                            <span class="fw-bold px-2">${i.qty}</span>
+                            <button class="btn btn-light btn-sm btn-touch" onclick="State.addItem(${i.id},'${i.nama}',${i.harga},${i.stokMax})">+</button>
+                        </div>
+                    </div>
+                </div>`).join('');
+
+            document.getElementById('area-keranjang-desktop').innerHTML = html;
+            document.getElementById('area-keranjang-mobile').innerHTML = html;
+            document.getElementById('cart-subtotal').innerText = formatCurr(State.subtotal);
+            document.getElementById('cart-tax').innerText = formatCurr(State.tax);
+            document.getElementById('cart-total').innerText = formatCurr(State.totalFinal);
+            document.getElementById('cart-total-mobile').innerText = formatCurr(State.totalFinal);
+            document.getElementById('cart-badge').innerText = State.cart.reduce((s, i) => s + i.qty, 0);
+        },
+
+        updatePayment() {
+            document.getElementById('pay-total-display').innerText = formatCurr(State.totalFinal);
+            document.getElementById('pay-received-display').innerText = formatCurr(State.received);
+            let change = State.received - State.totalFinal;
+            const el = document.getElementById('pay-change-display');
+            el.innerText = change < 0 ? 'Kurang ' + formatCurr(Math.abs(change)) : formatCurr(change);
+            el.className = change < 0 ? 'fw-black mb-0 text-danger' : 'fw-black mb-0 text-success';
+        },
+
+        toggleMetode() {
+            const isTunai = document.getElementById('btnTunai') ? document.getElementById('btnTunai').checked : false;
+            document.getElementById('panelNumpad').classList.toggle('d-none', !isTunai);
+            document.getElementById('panelQris').classList.toggle('d-none', isTunai);
+            document.getElementById('panelQris').classList.toggle('d-flex', !isTunai);
+            if(!isTunai) State.setPay(State.totalFinal); // Langsung pas kalau QRIS
+        },
+
+        openPayment() {
+            if(!State.cart.length) return alert("Keranjang belanja masih kosong!");
+            State.clearNumpad();
+            this.toggleMetode();
+            new bootstrap.Modal(document.getElementById('modalPembayaran')).show();
+        },
+
+        filterKatalog() {
+            let q = document.getElementById('inputPencarian').value.toLowerCase();
+            document.querySelectorAll('.item-menu').forEach(el => el.classList.toggle('d-none', !el.getAttribute('data-nama').includes(q)));
+        },
+
+        filterKategori(cat, btn) {
+            document.querySelectorAll('.menu-area .btn-danger').forEach(b => {
+                b.classList.replace('btn-danger', 'btn-white');
+                b.classList.add('text-secondary');
+            });
+            btn.classList.replace('btn-white', 'btn-danger');
+            btn.classList.remove('text-secondary');
+            document.querySelectorAll('.item-menu').forEach(el => el.classList.toggle('d-none', cat !== 'Semua' && el.getAttribute('data-kategori') !== cat));
+        }
+    };
+
+    // ==========================================
+    // 3. API SUBMIT & OFFLINE RESILIENCE
+    // ==========================================
+    const API = {
+        async submit() {
+            if(State.isProcessing) return;
+            
+            const isTunai = document.getElementById('btnTunai') ? document.getElementById('btnTunai').checked : false;
+            if(isTunai && State.received < State.totalFinal) return alert("Uang tunai pelanggan tidak cukup!");
+
+            State.isProcessing = true;
+            const btn = document.getElementById('btnFinalize');
+            btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> MEMPROSES...`;
+
+            const payload = { total: State.totalFinal, keranjang: State.cart, tanggal: new Date().toISOString().slice(0, 19).replace('T', ' ') };
+
+            if(!navigator.onLine) {
+                this.saveOffline(payload);
+                return this.success(99999);
+            }
+
+            try {
+                const res = await fetch('/bayar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const data = await res.json();
+                if(data.status === 'success') this.success(data.transaksi_id);
+                else throw new Error(data.message);
+            } catch(e) {
+                console.error(e);
+                this.saveOffline(payload);
+                this.success(88888);
+            } finally {
+                State.isProcessing = false;
+                btn.innerHTML = `SELESAIKAN TRANSAKSI <i class="bi bi-arrow-right-circle-fill ms-2"></i>`;
+            }
+        },
+        saveOffline(trx) {
+            let list = JSON.parse(localStorage.getItem('offline_trx') || '[]');
+            list.push(trx);
+            localStorage.setItem('offline_trx', JSON.stringify(list));
+        },
+        async sync() {
+            let list = JSON.parse(localStorage.getItem('offline_trx') || '[]');
+            if(!list.length) return;
+            try {
+                const res = await fetch('/sync_offline', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ transactions: list }) });
+                if(res.ok) localStorage.removeItem('offline_trx');
+            } catch(e) {}
+        },
+        success(id) {
+            State.lastTrxId = id;
+            bootstrap.Modal.getInstance(document.getElementById('modalPembayaran')).hide();
+            new bootstrap.Modal(document.getElementById('modalSuccess')).show();
+        }
+    };
+
+    // ==========================================
+    // 4. PRINTER SERVICE (SOLUSI CETAK STRUK)
+    // ==========================================
+    const PrinterService = {
+        device: null,
+        async connect() {
+            try {
+                this.device = await navigator.bluetooth.requestDevice({ filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }] });
+                document.getElementById('btnBT').innerHTML = `<i class="bi bi-bluetooth text-success fs-4"></i>`;
+            } catch(e) { alert("Printer Bluetooth tidak ditemukan atau dibatalkan."); }
+        },
+        print() {
+            // Karena ini dipicu langsung oleh KLIK USER pada tombol "Cetak Struk",
+            // Pop-up blocker browser TIDAK AKAN memblokir window.open ini.
+            if(!this.device) {
+                window.open('/cetak_struk/' + State.lastTrxId, '_blank');
+            } else {
+                alert("Mengirim data cetak ke Printer Bluetooth...");
+            }
+        }
+    };
+
+    // INIT
+    window.addEventListener('online', () => { document.getElementById('offlineBanner').classList.remove('show'); API.sync(); });
+    window.addEventListener('offline', () => document.getElementById('offlineBanner').classList.add('show'));
+    window.onload = () => { UI.render(); API.sync(); };
+</script>
+
+{% endblock %}

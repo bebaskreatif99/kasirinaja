@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KasirinAja - POS System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+    <nav class="navbar navbar-dark bg-danger shadow-sm">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1 fw-bold">KasirinAja 🐔</span>
+            <span class="text-white small">by {{ pembuat }}</span>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-3">
+        <div class="row">
+            <div class="col-md-8">
+                <h4 class="mb-3">Katalog Menu</h4>
+                <div class="row g-3">
+                    {% for item in menu %}
+                    <div class="col-md-4">
+                        <div class="card shadow-sm h-100 text-center py-3">
+                            <div class="card-body">
+                                <h5 class="card-title fw-bold">{{ item.nama }}</h5>
+                                <p class="card-text text-danger fw-bold">Rp {{ "{:,}".format(item.harga) }}</p>
+                                <button class="btn btn-outline-danger btn-sm w-100" onclick="tambahKeKeranjang({{ item.id }}, '{{ item.nama }}', {{ item.harga }})">Tambah</button>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0 fw-bold">Pesanan Saat Ini</h5>
+                    </div>
+                    <div class="card-body" id="area-keranjang">
+                        <p class="text-muted text-center">Keranjang masih kosong.</p>
+                    </div>
+                    <div class="card-footer bg-white">
+                        <h4 class="d-flex justify-content-between fw-bold">
+                            <span>Total:</span>
+                            <span id="total-harga">Rp 0</span>
+                        </h4>
+                        <button class="btn btn-success w-100 btn-lg mt-2 fw-bold">BAYAR</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
