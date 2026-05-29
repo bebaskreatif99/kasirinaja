@@ -236,5 +236,19 @@
     });
 </script>
 
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/static/sw.js')
+        .then(registration => {
+          console.log('ServiceWorker sukses didaftarkan dengan scope: ', registration.scope);
+        })
+        .catch(err => {
+          console.log('ServiceWorker gagal didaftarkan: ', err);
+        });
+    });
+  }
+</script>
+
 </body>
 </html>
