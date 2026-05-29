@@ -2,7 +2,7 @@
 {% block content %}
 
 <style>
-    /* OPTIMASI TOUCHSCREEN & ZERO-BOUNCE */
+    /* OPTIMASI TOUCHSCREEN & ZERO-BOUNCE UNTUK ANDROID/TABLET */
     :root { --touch-target: 48px; }
     body { overscroll-behavior-y: none; touch-action: manipulation; background-color: #f4f7f6; }
     .pos-layout { height: calc(100vh - 70px); overflow: hidden; }
@@ -26,14 +26,15 @@
     }
     .numpad-btn:active { background: #e2e6ea; transform: scale(0.95); }
 
-    #offlineBanner { z-index: 9999; top: -50px; transition: 0.4s ease; }
+    /* Banner Indikator Mode Offline */
+    #offlineBanner { z-index: 9999; top: -50px; transition: 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
     #offlineBanner.show { top: 0; }
     .fade-in { animation: fadeIn 0.3s ease; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 </style>
 
 <div id="offlineBanner" class="position-fixed w-100 bg-warning text-dark text-center fw-bold py-2 shadow-lg">
-    <i class="bi bi-wifi-off me-2"></i> Mode Offline Aktif. Transaksi disimpan lokal & akan sinkron otomatis.
+    <i class="bi bi-wifi-off me-2"></i> Mode Offline Aktif. Transaksi disimpan di memori HP & akan disetor otomatis saat online.
 </div>
 
 <div class="row g-0 pos-layout w-100 m-0">
@@ -49,10 +50,10 @@
         </div>
 
         <div class="d-flex overflow-auto hide-scroll gap-2 mb-4 pb-2">
-            <button class="btn btn-danger rounded-pill px-4 fw-bold flex-shrink-0 shadow-sm btn-touch" onclick="UI.filterKategori('Semua', this)">🔥 Semua</button>
-            <button class="btn btn-white bg-white border-0 rounded-pill px-4 fw-bold flex-shrink-0 text-secondary shadow-sm btn-touch" onclick="UI.filterKategori('Makanan', this)">🍗 Makanan</button>
-            <button class="btn btn-white bg-white border-0 rounded-pill px-4 fw-bold flex-shrink-0 text-secondary shadow-sm btn-touch" onclick="UI.filterKategori('Minuman', this)">🥤 Minuman</button>
-            <button class="btn btn-white bg-white border-0 rounded-pill px-4 fw-bold flex-shrink-0 text-secondary shadow-sm btn-touch" onclick="UI.filterKategori('Tambahan', this)">🍚 Lainnya</button>
+            <button class="btn btn-danger rounded-pill px-4 fw-bold flex-shrink-0 shadow-sm btn-touch" onclick="UI.filterKategori('Semua', this)">🍗 Semua</button>
+            <button class="btn btn-white bg-white border-0 rounded-pill px-4 fw-bold flex-shrink-0 text-secondary shadow-sm btn-touch" onclick="UI.filterKategori('Makanan', this)">🍱 Makanan</button>
+            <button class="btn btn-white bg-white border-0 rounded-pill px-4 fw-bold flex-shrink-0 text-secondary shadow-sm btn-touch" onclick="UI.filterKategori('Minuman', this)">🍹 Minuman</button>
+            <button class="btn btn-white bg-white border-0 rounded-pill px-4 fw-bold flex-shrink-0 text-secondary shadow-sm btn-touch" onclick="UI.filterKategori('Tambahan', this)">🍟 Lainnya</button>
         </div>
 
         <div class="row g-3" id="katalogMenu">
@@ -183,7 +184,7 @@
                         <div id="panelQris" class="d-none flex-column align-items-center justify-content-center py-5 text-center">
                             <i class="bi bi-qr-code fs-1 text-primary mb-3" style="font-size: 4rem !important;"></i>
                             <h4 class="fw-bold">Menunggu Pembayaran QRIS</h4>
-                            <p class="text-muted">Arahkan pelanggan untuk melakukan scan barcode di kasir. Pastikan dana sudah masuk ke rekening sebelum menyelesaikan.</p>
+                            <p class="text-muted">Arahkan pelanggan untuk melakukan scan barcode. Pastikan dana sudah masuk ke rekening sebelum menyelesaikan.</p>
                         </div>
                     </div>
 
@@ -307,7 +308,7 @@
             document.getElementById('panelNumpad').classList.toggle('d-none', !isTunai);
             document.getElementById('panelQris').classList.toggle('d-none', isTunai);
             document.getElementById('panelQris').classList.toggle('d-flex', !isTunai);
-            if(!isTunai) State.setPay(State.totalFinal); // Langsung pas kalau QRIS
+            if(!isTunai) State.setPay(State.totalFinal); 
         },
 
         openPayment() {
@@ -334,7 +335,7 @@
     };
 
     // ==========================================
-    // 3. API SUBMIT & OFFLINE RESILIENCE
+    // 3. API OTAK OFFLINE & AUTO-SYNC
     // ==========================================
     const API = {
         async submit() {
@@ -347,20 +348,42 @@
             const btn = document.getElementById('btnFinalize');
             btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> MEMPROSES...`;
 
-            const payload = { total: State.totalFinal, keranjang: State.cart, tanggal: new Date().toISOString().slice(0, 19).replace('T', ' ') };
+            const payload = { 
+                total: State.totalFinal, 
+                keranjang: State.cart, 
+                tanggal: new Date().toISOString().slice(0, 19).replace('T', ' ') 
+            };
 
+            // CEK 1: Jika HP dipastikan Offline (WiFi/Data Mati)
             if(!navigator.onLine) {
                 this.saveOffline(payload);
+                alert("Koneksi terputus! 📴 Transaksi dialihkan ke Mode Offline.");
                 return this.success(99999);
             }
 
+            // CEK 2: Jika terhubung, coba setor ke Pusat
             try {
-                const res = await fetch('/bayar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                // Beri batas waktu (timeout) 5 detik. Jika server lemot, paksa offline.
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+                const res = await fetch('/bayar', { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify(payload),
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+
                 const data = await res.json();
-                if(data.status === 'success') this.success(data.transaksi_id);
-                else throw new Error(data.message);
+                if(data.status === 'success') {
+                    this.success(data.transaksi_id);
+                } else {
+                    throw new Error(data.message);
+                }
             } catch(e) {
-                console.error(e);
+                // Server timeout atau RTO (Request Time Out)
+                console.warn("Gagal menghubungi server utama, mengalihkan ke penyimpanan lokal HP.", e);
                 this.saveOffline(payload);
                 this.success(88888);
             } finally {
@@ -368,19 +391,43 @@
                 btn.innerHTML = `SELESAIKAN TRANSAKSI <i class="bi bi-arrow-right-circle-fill ms-2"></i>`;
             }
         },
+        
         saveOffline(trx) {
             let list = JSON.parse(localStorage.getItem('offline_trx') || '[]');
             list.push(trx);
             localStorage.setItem('offline_trx', JSON.stringify(list));
+            // Tampilkan banner warning di atas
+            document.getElementById('offlineBanner').classList.add('show');
         },
+
         async sync() {
             let list = JSON.parse(localStorage.getItem('offline_trx') || '[]');
             if(!list.length) return;
+            
             try {
-                const res = await fetch('/sync_offline', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ transactions: list }) });
-                if(res.ok) localStorage.removeItem('offline_trx');
-            } catch(e) {}
+                const res = await fetch('/sync_offline', { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify({ transactions: list }) 
+                });
+                
+                if(res.ok) {
+                    const data = await res.json();
+                    localStorage.removeItem('offline_trx');
+                    
+                    // Sembunyikan banner warning
+                    document.getElementById('offlineBanner').classList.remove('show');
+                    
+                    // Notifikasi senyap agar kasir tahu datanya aman
+                    if (data.status === 'success' && data.synced_count > 0) {
+                        alert(`Sinkronisasi Sukses! ✅\n${data.synced_count} transaksi offline yang tersimpan di memori HP telah berhasil disetor otomatis ke Database Pusat.`);
+                    }
+                }
+            } catch(e) {
+                console.log("Sinkronisasi otomatis gagal, akan mencoba lagi saat ada aktivitas.");
+            }
         },
+        
         success(id) {
             State.lastTrxId = id;
             bootstrap.Modal.getInstance(document.getElementById('modalPembayaran')).hide();
@@ -400,8 +447,6 @@
             } catch(e) { alert("Printer Bluetooth tidak ditemukan atau dibatalkan."); }
         },
         print() {
-            // Karena ini dipicu langsung oleh KLIK USER pada tombol "Cetak Struk",
-            // Pop-up blocker browser TIDAK AKAN memblokir window.open ini.
             if(!this.device) {
                 window.open('/cetak_struk/' + State.lastTrxId, '_blank');
             } else {
@@ -410,8 +455,11 @@
         }
     };
 
-    // INIT
-    window.addEventListener('online', () => { document.getElementById('offlineBanner').classList.remove('show'); API.sync(); });
+    // INIT MATA-MATA SINYAL (AUTO SYNC)
+    window.addEventListener('online', () => { 
+        document.getElementById('offlineBanner').classList.remove('show'); 
+        API.sync(); 
+    });
     window.addEventListener('offline', () => document.getElementById('offlineBanner').classList.add('show'));
     window.onload = () => { UI.render(); API.sync(); };
 </script>
