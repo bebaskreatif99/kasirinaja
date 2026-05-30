@@ -361,6 +361,41 @@ def pengaturan():
     cur.close(); conn.close()
     return render_template('pengaturan.html', setting=setting)
 
+@app.route('/api/settings/change-password', methods=['POST'])
+@login_required
+def api_change_password():
+    data = request.get_json()
+    old_password = data.get('oldPassword')
+    new_password = data.get('newPassword')
+
+    if not old_password or not new_password or len(new_password) < 6:
+        return jsonify({"status": "error", "message": "Password baru harus minimal 6 karakter!"}), 400
+
+    conn = get_db_connection()
+    try:
+        # Ambil hash user dari DB berdasarkan Sesi Login saat ini
+        cur = conn.cursor()
+        user = cur.execute('SELECT password FROM users WHERE id = ?', (session['user_id'],)).fetchone()
+        
+        # Validasi Lapis 1: Cek Password Lama
+        if not user or not check_password_hash(user['password'], old_password):
+            return jsonify({"status": "error", "message": "Password lama yang Anda masukkan salah!"}), 401
+            
+        # Proses Hashing Keamanan Tinggi via Werkzeug Security
+        hashed_new_password = generate_password_hash(new_password)
+        
+        # Simpan ke Database
+        cur.execute('UPDATE users SET password = ? WHERE id = ?', (hashed_new_password, session['user_id']))
+        conn.commit()
+        
+        return jsonify({"status": "success", "message": "Keamanan diperbarui! Sandi berhasil diganti."}), 200
+        
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"status": "error", "message": "Internal Server Error!"}), 500
+    finally:
+        conn.close()
+
 @app.route('/bayar', methods=['POST'])
 @login_required
 def bayar():
