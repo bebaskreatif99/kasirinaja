@@ -438,23 +438,147 @@
     // ==========================================
     // 4. PRINTER SERVICE (SOLUSI CETAK STRUK)
     // ==========================================
+    // ==========================================
+    // 4. PRINTER SERVICE (IoT BLUETOOTH ESC/POS)
+    // ==========================================
     const PrinterService = {
         device: null,
+        server: null,
+        writeCharacteristic: null,
+
         async connect() {
             try {
-                this.device = await navigator.bluetooth.requestDevice({ filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }] });
+                console.log("🔍 [1/4] Meminta akses perangkat Bluetooth...");
+                // Note: Sesuaikan/Tambahkan Service UUID jika printer Anda menggunakan UUID standar lain
+                this.device = await navigator.bluetooth.requestDevice({
+                    filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }],
+                    optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
+                });
+                console.log(`✅ Perangkat dipilih: ${this.device.name}`);
+
+                console.log("🔄 [2/4] Menghubungkan ke GATT Server...");
+                this.server = await this.device.gatt.connect();
+                console.log("✅ GATT Server terhubung.");
+
+                console.log("🔍 [3/4] Mengambil Primary Service...");
+                const service = await this.server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+                console.log("✅ Service valid ditemukan.");
+
+                console.log("🔍 [4/4] Memindai Characteristic untuk jalur Tulis (Write)...");
+                const characteristics = await service.getCharacteristics();
+                
+                // Looping pintar untuk mencari Characteristic yang tidak di-lock (Bisa ditulis)
+                for (const char of characteristics) {
+                    console.log(`  -> Mengecek UUID: ${char.uuid} | Read: ${char.properties.read} | Write: ${char.properties.write} | WriteWoRes: ${char.properties.writeWithoutResponse}`);
+                    
+                    if (char.properties.write || char.properties.writeWithoutResponse) {
+                        this.writeCharacteristic = char;
+                        console.log(`🎯 TARGET KUNCI DITEMUKAN! Menggunakan Characteristic: ${char.uuid}`);
+                        break; 
+                    }
+                }
+
+                if (!this.writeCharacteristic) {
+                    throw new Error("❌ Printer ini menolak akses tulis. Tidak ada Characteristic yang valid.");
+                }
+
                 document.getElementById('btnBT').innerHTML = `<i class="bi bi-bluetooth text-success fs-4"></i>`;
-            } catch(e) { alert("Printer Bluetooth tidak ditemukan atau dibatalkan."); }
+                alert("Perangkat Thermal sukses terhubung dan jalur cetak terbuka!");
+
+            } catch(e) { 
+                console.error("🔥 ERROR BLUETOOTH CONNECT:", e);
+                alert("Koneksi gagal atau dibatalkan. Cek Console untuk detail log."); 
+            }
         },
-        print() {
-            if(!this.device) {
+
+        async print() {
+            // Fallback ke PDF/Web Print jika Bluetooth tidak aktif
+            if (!this.writeCharacteristic) {
+                console.warn("⚠️ Printer fisik tidak terdeteksi. Membuka mode cetak web/PDF...");
                 window.open('/cetak_struk/' + State.lastTrxId, '_blank');
-            } else {
-                alert("Mengirim data cetak ke Printer Bluetooth...");
+                return;
+            }
+
+            try {
+                console.log("🖨️ --- MEMULAI PROSES CETAK ESC/POS ---");
+                
+                // 1. GENERATE TEKS STRUK DARI STATE LOKAL KASIR
+                // Mengambil nama toko dan kontak dari elemen UI navigasi/setting jika ada, 
+                // atau gunakan teks statis jika tidak tersedia.
+                const namaToko = document.querySelector('.logo-text')?.innerText || "KASIRINAJA";
+                const waktu = new Date().toLocaleString('id-ID');
+                
+                let textStruk = `\n     ${namaToko.toUpperCase()}     \n`;
+                textStruk += `================================\n`;
+                textStruk += `Tanggal : ${waktu}\n`;
+                textStruk += `Nota ID : #${State.lastTrxId || '0000'}\n`;
+                textStruk += `--------------------------------\n`;
+                
+                State.cart.forEach(item => {
+                    textStruk += `${item.qty}x ${item.nama}\n`;
+                    textStruk += `    @ Rp${item.harga}     Rp${item.harga * item.qty}\n`;
+                });
+                
+                textStruk += `--------------------------------\n`;
+                textStruk += `Subtotal  : Rp${State.subtotal}\n`;
+                if(State.tax > 0) textStruk += `Pajak/Fee : Rp${State.tax}\n`;
+                textStruk += `TOTAL     : Rp${State.totalFinal}\n`;
+                textStruk += `DIBAYAR   : Rp${State.received}\n`;
+                textStruk += `KEMBALI   : Rp${State.received - State.totalFinal}\n`;
+                textStruk += `================================\n`;
+                textStruk += `     TERIMA KASIH     \n\n`;
+
+                console.log("📝 Draft Teks Struk Selesai Dibuat.");
+
+                // 2. PERSIAPAN BYTE ESC/POS (HARDWARE COMMANDS)
+                const INIT_PRINTER = new Uint8Array([0x1B, 0x40]); // Initialize
+                const FEED_PAPER = new Uint8Array([0x0A, 0x0A, 0x0A, 0x0A]); // 4x Line Feed agar tidak nyangkut
+
+                // 3. ENCODE STRING KE BYTE ARRAY
+                const encoder = new TextEncoder();
+                const textBytes = encoder.encode(textStruk);
+                console.log(`📏 Ukuran data teks murni: ${textBytes.length} bytes`);
+
+                // 4. MERGE (GABUNGKAN) INIT + TEKS + FEED KE DALAM SATU BUFFER
+                const totalLength = INIT_PRINTER.length + textBytes.length + FEED_PAPER.length;
+                const finalData = new Uint8Array(totalLength);
+                
+                finalData.set(INIT_PRINTER, 0);
+                finalData.set(textBytes, INIT_PRINTER.length);
+                finalData.set(FEED_PAPER, INIT_PRINTER.length + textBytes.length);
+                
+                console.log(`📦 Total payload siap kirim: ${finalData.length} bytes`);
+
+                // 5. CHUNKING DATA (POTONG 512 BYTES) UNTUK MENCEGAH BUFFER OVERFLOW
+                const CHUNK_SIZE = 512;
+                let offset = 0;
+
+                while (offset < finalData.length) {
+                    const end = Math.min(offset + CHUNK_SIZE, finalData.length);
+                    const chunk = finalData.slice(offset, end);
+                    
+                    console.log(`📤 Mengirim Chunk: Byte ${offset} s/d ${end} (${chunk.length} bytes)`);
+                    
+                    if (this.writeCharacteristic.properties.writeWithoutResponse) {
+                        await this.writeCharacteristic.writeValueWithoutResponse(chunk);
+                    } else {
+                        await this.writeCharacteristic.writeValue(chunk);
+                    }
+                    
+                    offset = end;
+                    
+                    // Jeda 50ms per potongan agar prosesor printer murah sempat bernapas
+                    await new Promise(resolve => setTimeout(resolve, 50)); 
+                }
+
+                console.log("✅ --- CETAK BERHASIL TANPA CRASH ---");
+
+            } catch (e) {
+                console.error("🔥 ERROR PROSES CETAK:", e);
+                alert("Koneksi printer terputus saat mencetak. Cek baterai atau dekatkan perangkat.");
             }
         }
     };
-
     // INIT MATA-MATA SINYAL (AUTO SYNC)
     window.addEventListener('online', () => { 
         document.getElementById('offlineBanner').classList.remove('show'); 
