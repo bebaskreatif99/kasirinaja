@@ -2,31 +2,18 @@
 {% block content %}
 
 <style>
-    /* OPTIMASI TOUCHSCREEN & ZERO-BOUNCE UNTUK ANDROID/TABLET */
     :root { --touch-target: 48px; }
     body { overscroll-behavior-y: none; touch-action: manipulation; background-color: #f4f7f6; }
     .pos-layout { height: calc(100vh - 70px); overflow: hidden; }
     @media (max-width: 991px) { .pos-layout { height: calc(100vh - 120px); } }
-
     .menu-area { height: 100%; overflow-y: auto; padding-bottom: 120px; -webkit-overflow-scrolling: touch; }
     .hide-scroll::-webkit-scrollbar { display: none; }
-
-    .btn-touch { 
-        min-width: var(--touch-target); min-height: var(--touch-target); 
-        display: flex; align-items: center; justify-content: center;
-        border-radius: 12px; font-weight: bold; transition: 0.1s; user-select: none;
-    }
+    .btn-touch { min-width: var(--touch-target); min-height: var(--touch-target); display: flex; align-items: center; justify-content: center; border-radius: 12px; font-weight: bold; transition: 0.1s; user-select: none; }
     .btn-touch:active { transform: scale(0.92); opacity: 0.8; }
     .card-menu { cursor: pointer; border: none; border-radius: 20px; transition: transform 0.1s; overflow: hidden; }
     .card-menu:active { transform: scale(0.96); }
-
-    .numpad-btn { 
-        min-height: 60px; font-size: 1.5rem; font-weight: bold; 
-        border-radius: 16px; border: 1px solid #eee; background: #f8f9fa;
-    }
+    .numpad-btn { min-height: 60px; font-size: 1.5rem; font-weight: bold; border-radius: 16px; border: 1px solid #eee; background: #f8f9fa; }
     .numpad-btn:active { background: #e2e6ea; transform: scale(0.95); }
-
-    /* Banner Indikator Mode Offline */
     #offlineBanner { z-index: 9999; top: -50px; transition: 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
     #offlineBanner.show { top: 0; }
     .fade-in { animation: fadeIn 0.3s ease; }
@@ -34,7 +21,7 @@
 </style>
 
 <div id="offlineBanner" class="position-fixed w-100 bg-warning text-dark text-center fw-bold py-2 shadow-lg">
-    <i class="bi bi-wifi-off me-2"></i> Mode Offline Aktif. Transaksi disimpan di memori HP & akan disetor otomatis saat online.
+    <i class="bi bi-wifi-off me-2"></i> Mode Offline Aktif. Transaksi disimpan & disetor otomatis saat online.
 </div>
 
 <div class="row g-0 pos-layout w-100 m-0">
@@ -45,9 +32,15 @@
                 <input type="text" id="inputPencarian" class="form-control border-0 py-3 shadow-none fw-semibold" placeholder="Cari menu ayam, kopi, dsb..." onkeyup="UI.filterKatalog()">
             </div>
             
+            {% if setting and setting.printer == 'BT-Printer-58mm' %}
             <button id="btnBTIndicator" class="btn btn-white bg-white rounded-circle shadow-sm flex-shrink-0" style="width: 56px;" title="Status Printer Bluetooth">
                 <i id="iconBT" class="bi bi-bluetooth text-muted fs-4 transition-hover"></i>
             </button>
+            {% else %}
+            <button id="btnBTOff" class="btn btn-light rounded-circle shadow-sm flex-shrink-0 opacity-50" style="width: 56px;" title="Mode PDF Aktif" disabled>
+                <i class="bi bi-bluetooth text-muted fs-4"></i>
+            </button>
+            {% endif %}
         </div>
 
         <div class="d-flex overflow-auto hide-scroll gap-2 mb-4 pb-2">
@@ -69,9 +62,6 @@
                         {% endif %}
                     </div>
                     <div class="card-body p-3 text-center bg-white">
-                        {% if item.stok <= item.stok_min %}
-                            <span class="badge rounded-pill bg-warning text-dark mb-1">Sisa {{ item.stok }}</span>
-                        {% endif %}
                         <h6 class="fw-bold mb-1 text-dark text-truncate">{{ item.nama }}</h6>
                         <span class="text-danger fw-bold">Rp {{ "{:,}".format(item.harga) }}</span>
                     </div>
@@ -86,22 +76,10 @@
             <h5 class="mb-0 fw-bold"><i class="bi bi-bag-heart text-danger me-2"></i>Keranjang</h5>
             <button class="btn btn-sm btn-light rounded-pill px-3 fw-bold text-muted" onclick="State.clearCart()">Kosongkan</button>
         </div>
-        
         <div class="cart-area flex-grow-1 overflow-auto p-3 bg-light" id="area-keranjang-desktop"></div>
-
         <div class="p-4 bg-white border-top shadow-lg">
-            <div class="d-flex justify-content-between mb-2">
-                <span class="text-muted fw-semibold">Subtotal</span>
-                <span class="fw-bold" id="cart-subtotal">Rp 0</span>
-            </div>
-            <div class="d-flex justify-content-between mb-3 pb-3 border-bottom border-dashed">
-                <span class="text-muted fw-semibold">Pajak & Biaya</span>
-                <span class="fw-bold text-primary" id="cart-tax">Rp 0</span>
-            </div>
-            <div class="d-flex justify-content-between align-items-end mb-4">
-                <span class="text-muted fw-bold">Total Tagihan</span>
-                <h2 class="fw-black text-danger mb-0" id="cart-total">Rp 0</h2>
-            </div>
+            <div class="d-flex justify-content-between mb-2"><span class="text-muted fw-semibold">Subtotal</span><span class="fw-bold" id="cart-subtotal">Rp 0</span></div>
+            <div class="d-flex justify-content-between align-items-end mb-4"><span class="text-muted fw-bold">Total Tagihan</span><h2 class="fw-black text-danger mb-0" id="cart-total">Rp 0</h2></div>
             <button class="btn btn-success w-100 fw-bold rounded-4 shadow-sm py-3 fs-5 btn-touch" onclick="UI.openPayment()">PROSES PEMBAYARAN</button>
         </div>
     </div>
@@ -119,10 +97,7 @@
     </div>
     <div class="offcanvas-body p-3 bg-light" id="area-keranjang-mobile"></div>
     <div class="p-4 bg-white border-top">
-        <div class="d-flex justify-content-between mb-3">
-            <span class="text-muted fw-bold">Total Tagihan</span>
-            <h3 class="fw-black text-danger mb-0" id="cart-total-mobile">Rp 0</h3>
-        </div>
+        <div class="d-flex justify-content-between mb-3"><span class="text-muted fw-bold">Total Tagihan</span><h3 class="fw-black text-danger mb-0" id="cart-total-mobile">Rp 0</h3></div>
         <button class="btn btn-success w-100 fw-bold rounded-pill py-3 fs-5" onclick="UI.openPayment()">BAYAR SEKARANG</button>
     </div>
 </div>
@@ -131,13 +106,11 @@
     <div class="modal-dialog modal-dialog-centered modal-xl">
         <div class="modal-content border-0 rounded-5 shadow-lg overflow-hidden">
             <div class="modal-body p-0 row g-0">
-                
                 <div class="col-md-4 bg-danger p-4 p-md-5 text-white d-flex flex-column justify-content-between">
                     <div>
                         <button type="button" class="btn-close btn-close-white mb-4" data-bs-dismiss="modal"></button>
                         <h6 class="opacity-75 fw-bold text-uppercase mb-1">Total Tagihan</h6>
                         <h1 class="display-4 fw-black mb-4" id="pay-total-display">Rp 0</h1>
-                        
                         <div class="bg-white bg-opacity-10 p-3 rounded-4 border border-white border-opacity-25 mb-3">
                             <span class="d-block small opacity-75 mb-1">Nominal Diterima:</span>
                             <h3 class="fw-bold mb-0" id="pay-received-display">Rp 0</h3>
@@ -148,23 +121,13 @@
                         <h3 class="fw-black mb-0 text-success" id="pay-change-display">Rp 0</h3>
                     </div>
                 </div>
-
                 <div class="col-md-8 p-4 p-md-5 bg-white d-flex flex-column justify-content-between">
                     <div>
                         <h6 class="fw-bold text-muted mb-3">Pilih Metode Pembayaran</h6>
-                        
                         <div class="d-flex gap-2 mb-4">
-                            {% if setting and setting.is_cash_active %}
                             <input type="radio" class="btn-check" name="metodeBayar" id="btnTunai" value="Tunai" checked onchange="UI.toggleMetode()">
                             <label class="btn btn-outline-danger fw-bold flex-grow-1 py-3 rounded-4 shadow-sm" for="btnTunai"><i class="bi bi-cash-stack fs-5 me-2"></i> TUNAI</label>
-                            {% endif %}
-
-                            {% if setting and setting.is_qris_active %}
-                            <input type="radio" class="btn-check" name="metodeBayar" id="btnQris" value="QRIS" {% if not setting.is_cash_active %}checked{% endif %} onchange="UI.toggleMetode()">
-                            <label class="btn btn-outline-primary fw-bold flex-grow-1 py-3 rounded-4 shadow-sm" for="btnQris"><i class="bi bi-qr-code-scan fs-5 me-2"></i> QRIS</label>
-                            {% endif %}
                         </div>
-
                         <div id="panelNumpad">
                             <div class="row g-2 mb-3">
                                 <div class="col-3"><button class="btn btn-warning w-100 fw-bold py-3 rounded-4 shadow-sm" onclick="State.setPay(State.totalFinal)">PAS</button></div>
@@ -173,22 +136,13 @@
                                 <div class="col-3"><button class="btn btn-outline-dark w-100 fw-bold py-3 rounded-4 shadow-sm" onclick="State.addPay(100000)">100K</button></div>
                             </div>
                             <div class="row g-2 mb-4">
-                                {% for n in [1,2,3,4,5,6,7,8,9] %}
-                                <div class="col-4"><button class="numpad-btn w-100" onclick="State.inputNumpad({{n}})">{{n}}</button></div>
-                                {% endfor %}
+                                {% for n in [1,2,3,4,5,6,7,8,9] %}<div class="col-4"><button class="numpad-btn w-100" onclick="State.inputNumpad({{n}})">{{n}}</button></div>{% endfor %}
                                 <div class="col-4"><button class="numpad-btn w-100 text-danger" onclick="State.clearNumpad()">C</button></div>
                                 <div class="col-4"><button class="numpad-btn w-100" onclick="State.inputNumpad(0)">0</button></div>
                                 <div class="col-4"><button class="numpad-btn w-100" onclick="State.inputNumpad('000')">000</button></div>
                             </div>
                         </div>
-
-                        <div id="panelQris" class="d-none flex-column align-items-center justify-content-center py-5 text-center">
-                            <i class="bi bi-qr-code fs-1 text-primary mb-3" style="font-size: 4rem !important;"></i>
-                            <h4 class="fw-bold">Menunggu Pembayaran QRIS</h4>
-                            <p class="text-muted">Arahkan pelanggan untuk melakukan scan barcode. Pastikan dana sudah masuk ke rekening sebelum menyelesaikan.</p>
-                        </div>
                     </div>
-
                     <button id="btnFinalize" class="btn btn-success w-100 py-3 rounded-pill fw-black fs-4 shadow-lg mt-auto" onclick="API.submit()">
                         SELESAIKAN TRANSAKSI <i class="bi bi-arrow-right-circle-fill ms-2"></i>
                     </button>
@@ -213,69 +167,40 @@
 </div>
 
 <script>
-    // ==========================================
-    // 1. STATE MANAGEMENT & CALCULATIONS
-    // ==========================================
-    const SETTINGS = {
-        taxRate: {{ setting.pajak_pb1 | default(0) }} / 100,
-        serviceRate: {{ setting.service_charge | default(0) }} / 100
-    };
-
+    const SETTINGS = { taxRate: 0, serviceRate: 0 };
     const formatCurr = (n) => 'Rp ' + Math.round(n).toLocaleString('id-ID');
 
     const State = {
-        cart: [], subtotal: 0, tax: 0, totalFinal: 0, received: 0,
-        isProcessing: false, lastTrxId: null,
-
+        cart: [], subtotal: 0, tax: 0, totalFinal: 0, received: 0, isProcessing: false, lastTrxId: null,
         addItem(id, nama, harga, stok) {
             let item = this.cart.find(i => i.id === id);
-            if(item) {
-                if(item.qty >= stok) return alert("Stok habis!");
-                item.qty++;
-            } else {
-                if(stok < 1) return alert("Stok habis!");
-                this.cart.push({ id, nama, harga: parseInt(harga), qty: 1, stokMax: stok });
-            }
+            if(item) { if(item.qty >= stok) return alert("Stok habis!"); item.qty++; } 
+            else { this.cart.push({ id, nama, harga: parseInt(harga), qty: 1, stokMax: stok }); }
             this.sync();
         },
         removeItem(id) {
             let idx = this.cart.findIndex(i => i.id === id);
-            if(idx !== -1) {
-                this.cart[idx].qty--;
-                if(this.cart[idx].qty === 0) this.cart.splice(idx, 1);
-            }
+            if(idx !== -1) { this.cart[idx].qty--; if(this.cart[idx].qty === 0) this.cart.splice(idx, 1); }
             this.sync();
         },
         clearCart() { if(confirm('Hapus seluruh keranjang?')) { this.cart = []; this.sync(); } },
-        
         sync() {
             this.subtotal = this.cart.reduce((s, i) => s + (i.harga * i.qty), 0);
-            this.tax = Math.round(this.subtotal * (SETTINGS.taxRate + SETTINGS.serviceRate));
-            this.totalFinal = this.subtotal + this.tax;
+            this.totalFinal = this.subtotal;
             UI.render();
         },
-
-        inputNumpad(v) { 
-            this.received = this.received === 0 ? parseInt(v) : parseInt(this.received.toString() + v.toString());
-            UI.updatePayment();
-        },
+        inputNumpad(v) { this.received = this.received === 0 ? parseInt(v) : parseInt(this.received.toString() + v.toString()); UI.updatePayment(); },
         addPay(v) { this.received += v; UI.updatePayment(); },
         setPay(v) { this.received = v; UI.updatePayment(); },
         clearNumpad() { this.received = 0; UI.updatePayment(); }
     };
 
-    // ==========================================
-    // 2. UI CONTROLLER (DOM RENDERING)
-    // ==========================================
     const UI = {
         render() {
             const html = !State.cart.length ? `<div class="text-center py-5 opacity-50"><i class="bi bi-cart-x fs-1"></i><p>Keranjang kosong</p></div>` 
                 : State.cart.map(i => `
                 <div class="bg-white p-3 rounded-4 shadow-sm mb-2 fade-in">
-                    <div class="d-flex justify-content-between mb-2">
-                        <strong class="text-dark">${i.nama}</strong>
-                        <span class="fw-bold text-danger">${formatCurr(i.harga * i.qty)}</span>
-                    </div>
+                    <div class="d-flex justify-content-between mb-2"><strong class="text-dark">${i.nama}</strong><span class="fw-bold text-danger">${formatCurr(i.harga * i.qty)}</span></div>
                     <div class="d-flex justify-content-between align-items-center">
                         <small class="text-muted">@${formatCurr(i.harga)}</small>
                         <div class="d-flex align-items-center gap-2">
@@ -285,16 +210,13 @@
                         </div>
                     </div>
                 </div>`).join('');
-
             document.getElementById('area-keranjang-desktop').innerHTML = html;
             document.getElementById('area-keranjang-mobile').innerHTML = html;
             document.getElementById('cart-subtotal').innerText = formatCurr(State.subtotal);
-            document.getElementById('cart-tax').innerText = formatCurr(State.tax);
             document.getElementById('cart-total').innerText = formatCurr(State.totalFinal);
             document.getElementById('cart-total-mobile').innerText = formatCurr(State.totalFinal);
             document.getElementById('cart-badge').innerText = State.cart.reduce((s, i) => s + i.qty, 0);
         },
-
         updatePayment() {
             document.getElementById('pay-total-display').innerText = formatCurr(State.totalFinal);
             document.getElementById('pay-received-display').innerText = formatCurr(State.received);
@@ -303,132 +225,50 @@
             el.innerText = change < 0 ? 'Kurang ' + formatCurr(Math.abs(change)) : formatCurr(change);
             el.className = change < 0 ? 'fw-black mb-0 text-danger' : 'fw-black mb-0 text-success';
         },
-
-        toggleMetode() {
-            const isTunai = document.getElementById('btnTunai') ? document.getElementById('btnTunai').checked : false;
-            document.getElementById('panelNumpad').classList.toggle('d-none', !isTunai);
-            document.getElementById('panelQris').classList.toggle('d-none', isTunai);
-            document.getElementById('panelQris').classList.toggle('d-flex', !isTunai);
-            if(!isTunai) State.setPay(State.totalFinal); 
-        },
-
+        toggleMetode() { State.setPay(State.totalFinal); },
         openPayment() {
-            if(!State.cart.length) return alert("Keranjang belanja masih kosong!");
-            State.clearNumpad();
-            this.toggleMetode();
+            if(!State.cart.length) return alert("Keranjang belanja kosong!");
+            State.clearNumpad(); this.toggleMetode();
             new bootstrap.Modal(document.getElementById('modalPembayaran')).show();
         },
-
         filterKatalog() {
             let q = document.getElementById('inputPencarian').value.toLowerCase();
             document.querySelectorAll('.item-menu').forEach(el => el.classList.toggle('d-none', !el.getAttribute('data-nama').includes(q)));
         },
-
         filterKategori(cat, btn) {
-            document.querySelectorAll('.menu-area .btn-danger').forEach(b => {
-                b.classList.replace('btn-danger', 'btn-white');
-                b.classList.add('text-secondary');
-            });
-            btn.classList.replace('btn-white', 'btn-danger');
-            btn.classList.remove('text-secondary');
+            document.querySelectorAll('.menu-area .btn-danger').forEach(b => { b.classList.replace('btn-danger', 'btn-white'); b.classList.add('text-secondary'); });
+            btn.classList.replace('btn-white', 'btn-danger'); btn.classList.remove('text-secondary');
             document.querySelectorAll('.item-menu').forEach(el => el.classList.toggle('d-none', cat !== 'Semua' && el.getAttribute('data-kategori') !== cat));
         }
     };
 
-    // ==========================================
-    // 3. API OTAK OFFLINE & AUTO-SYNC
-    // ==========================================
     const API = {
         async submit() {
             if(State.isProcessing) return;
-            
-            const isTunai = document.getElementById('btnTunai') ? document.getElementById('btnTunai').checked : false;
-            if(isTunai && State.received < State.totalFinal) return alert("Uang tunai pelanggan tidak cukup!");
-
+            if(State.received < State.totalFinal) return alert("Uang tunai kurang!");
             State.isProcessing = true;
             const btn = document.getElementById('btnFinalize');
             btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> MEMPROSES...`;
-
-            const payload = { 
-                total: State.totalFinal, 
-                keranjang: State.cart, 
-                tanggal: new Date().toISOString().slice(0, 19).replace('T', ' ') 
-            };
-
-            // CEK 1: Jika HP dipastikan Offline (WiFi/Data Mati)
-            if(!navigator.onLine) {
-                this.saveOffline(payload);
-                alert("Koneksi terputus! 📴 Transaksi dialihkan ke Mode Offline.");
-                return this.success(99999);
-            }
-
-            // CEK 2: Jika terhubung, coba setor ke Pusat
+            const payload = { total: State.totalFinal, keranjang: State.cart, tanggal: new Date().toISOString().slice(0, 19).replace('T', ' ') };
+            if(!navigator.onLine) { this.saveOffline(payload); return this.success(99999); }
             try {
-                // Beri batas waktu (timeout) 5 detik. Jika server lemot, paksa offline.
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-                const res = await fetch('/bayar', { 
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify(payload),
-                    signal: controller.signal
-                });
-                clearTimeout(timeoutId);
-
+                const res = await fetch('/bayar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                 const data = await res.json();
-                if(data.status === 'success') {
-                    this.success(data.transaksi_id);
-                } else {
-                    throw new Error(data.message);
-                }
-            } catch(e) {
-                // Server timeout atau RTO (Request Time Out)
-                console.warn("Gagal menghubungi server utama, mengalihkan ke penyimpanan lokal HP.", e);
-                this.saveOffline(payload);
-                this.success(88888);
-            } finally {
-                State.isProcessing = false;
-                btn.innerHTML = `SELESAIKAN TRANSAKSI <i class="bi bi-arrow-right-circle-fill ms-2"></i>`;
-            }
+                if(data.status === 'success') this.success(data.transaksi_id); else throw new Error(data.message);
+            } catch(e) { this.saveOffline(payload); this.success(88888); } 
+            finally { State.isProcessing = false; btn.innerHTML = `SELESAIKAN TRANSAKSI <i class="bi bi-arrow-right-circle-fill ms-2"></i>`; }
         },
-        
         saveOffline(trx) {
-            let list = JSON.parse(localStorage.getItem('offline_trx') || '[]');
-            list.push(trx);
-            localStorage.setItem('offline_trx', JSON.stringify(list));
-            // Tampilkan banner warning di atas
-            document.getElementById('offlineBanner').classList.add('show');
+            let list = JSON.parse(localStorage.getItem('offline_trx') || '[]'); list.push(trx);
+            localStorage.setItem('offline_trx', JSON.stringify(list)); document.getElementById('offlineBanner').classList.add('show');
         },
-
         async sync() {
-            let list = JSON.parse(localStorage.getItem('offline_trx') || '[]');
-            if(!list.length) return;
-            
+            let list = JSON.parse(localStorage.getItem('offline_trx') || '[]'); if(!list.length) return;
             try {
-                const res = await fetch('/sync_offline', { 
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify({ transactions: list }) 
-                });
-                
-                if(res.ok) {
-                    const data = await res.json();
-                    localStorage.removeItem('offline_trx');
-                    
-                    // Sembunyikan banner warning
-                    document.getElementById('offlineBanner').classList.remove('show');
-                    
-                    // Notifikasi senyap agar kasir tahu datanya aman
-                    if (data.status === 'success' && data.synced_count > 0) {
-                        alert(`Sinkronisasi Sukses! ✅\n${data.synced_count} transaksi offline yang tersimpan di memori HP telah berhasil disetor otomatis ke Database Pusat.`);
-                    }
-                }
-            } catch(e) {
-                console.log("Sinkronisasi otomatis gagal, akan mencoba lagi saat ada aktivitas.");
-            }
+                const res = await fetch('/sync_offline', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ transactions: list }) });
+                if(res.ok) { localStorage.removeItem('offline_trx'); document.getElementById('offlineBanner').classList.remove('show'); }
+            } catch(e) {}
         },
-        
         success(id) {
             State.lastTrxId = id;
             bootstrap.Modal.getInstance(document.getElementById('modalPembayaran')).hide();
@@ -436,107 +276,71 @@
         }
     };
 
-    // ==========================================
-    // 4. SEAMLESS PRINTING CLIENT (KONSUMEN GLOBAL STORE)
-    // ==========================================
+    // --- SEAMLESS PRINTING (MEMANGGIL GLOBAL STORE) ---
     const PrinterService = {
         async print() {
-            // Cek ke Global State (Store) di layout.html
-            if (!window.PrinterStore || !window.PrinterStore.getStatus()) {
-                alert("📴 Printer belum terhubung! Silakan buka menu 'Pengaturan Toko' untuk menyambungkan printer Bluetooth Anda.");
-                // Fallback cetak via browser/PDF
+            // Cek apakah Bluetooth direstui oleh Pengaturan Toko
+            const isBTAktif = document.getElementById('btnBTIndicator') !== null;
+            
+            if (!isBTAktif) {
+                // Mode PDF / Cetak Web Normal
                 window.open('/cetak_struk/' + State.lastTrxId, '_blank');
                 return;
             }
 
             try {
-                console.log("🖨️ Mengirim data ke Global Printer Store...");
-                
-                // GENERATE TEKS STRUK DARI STATE LOKAL KASIR
                 const namaToko = document.querySelector('.logo-text')?.innerText || "KASIRINAJA";
                 const waktu = new Date().toLocaleString('id-ID');
                 
-                let textStruk = `\n     ${namaToko.toUpperCase()}     \n`;
-                textStruk += `================================\n`;
-                textStruk += `Tanggal : ${waktu}\n`;
-                textStruk += `Nota ID : #${State.lastTrxId || '0000'}\n`;
-                textStruk += `--------------------------------\n`;
-                
-                State.cart.forEach(item => {
-                    textStruk += `${item.qty}x ${item.nama}\n`;
-                    textStruk += `    @ Rp${item.harga}     Rp${item.harga * item.qty}\n`;
-                });
-                
-                textStruk += `--------------------------------\n`;
-                textStruk += `Subtotal  : Rp${State.subtotal}\n`;
-                if(State.tax > 0) textStruk += `Pajak/Fee : Rp${State.tax}\n`;
-                textStruk += `TOTAL     : Rp${State.totalFinal}\n`;
-                textStruk += `DIBAYAR   : Rp${State.received}\n`;
-                textStruk += `KEMBALI   : Rp${State.received - State.totalFinal}\n`;
-                textStruk += `================================\n`;
-                textStruk += `     TERIMA KASIH     \n\n`;
+                let textStruk = `\n     ${namaToko.toUpperCase()}     \n================================\nTanggal : ${waktu}\nNota ID : #${State.lastTrxId || '0000'}\n--------------------------------\n`;
+                State.cart.forEach(item => { textStruk += `${item.qty}x ${item.nama}\n    @ Rp${item.harga}     Rp${item.harga * item.qty}\n`; });
+                textStruk += `--------------------------------\nTOTAL     : Rp${State.totalFinal}\nDIBAYAR   : Rp${State.received}\nKEMBALI   : Rp${State.received - State.totalFinal}\n================================\n     TERIMA KASIH     \n\n`;
 
-                // ENCODE STRING KE BYTE ARRAY DAN CHUNKING DITANGANI OLEH GLOBAL STORE
                 const encoder = new TextEncoder();
                 const textBytes = encoder.encode(textStruk);
-                
-                const INIT_PRINTER = new Uint8Array([0x1B, 0x40]); 
-                const FEED_PAPER = new Uint8Array([0x0A, 0x0A, 0x0A, 0x0A]); 
-
+                const INIT_PRINTER = new Uint8Array([0x1B, 0x40]);
+                const FEED_PAPER = new Uint8Array([0x0A, 0x0A, 0x0A, 0x0A]);
                 const finalData = new Uint8Array(INIT_PRINTER.length + textBytes.length + FEED_PAPER.length);
+                
                 finalData.set(INIT_PRINTER, 0);
                 finalData.set(textBytes, INIT_PRINTER.length);
                 finalData.set(FEED_PAPER, INIT_PRINTER.length + textBytes.length);
 
-                // Kirim Payload ke Global Store
+                // Kirim Payload ke Global Store (Store akan otomatis menyambungkan jika sempat diskonek)
                 await window.PrinterStore.print(finalData);
-                console.log("✅ Cetak sukses via Global Store.");
+                
             } catch (e) {
-                console.error("🔥 ERROR PROSES CETAK:", e);
-                alert("Gagal mencetak: " + e.message);
+                alert("Peringatan Cetak Bluetooth: " + e.message);
+                // Fallback aman jika alat rusak / mati
+                window.open('/cetak_struk/' + State.lastTrxId, '_blank');
             }
         }
     };
-    
-    // ==========================================
-    // 5. INITIALIZATION & EVENT LISTENERS
-    // ==========================================
-    
-    // Sinkronisasi Ikon Header dengan Global State
+
     window.addEventListener('printerStatus', (e) => {
         const icon = document.getElementById('iconBT');
         const btnIndicator = document.getElementById('btnBTIndicator');
         if(icon && btnIndicator) {
-            if(e.detail.connected) {
-                icon.classList.replace('text-muted', 'text-primary');
+            if (e.detail.connecting) {
+                icon.className = 'spinner-border spinner-border-sm text-warning fs-5';
+                btnIndicator.title = "Menyambungkan...";
+            } else if(e.detail.connected) {
+                icon.className = 'bi bi-bluetooth text-primary fs-4 transition-hover';
                 btnIndicator.title = `Terhubung: ${e.detail.name}`;
             } else {
-                icon.classList.replace('text-primary', 'text-muted');
+                icon.className = 'bi bi-bluetooth text-muted fs-4 transition-hover';
                 btnIndicator.title = "Printer Offline";
             }
         }
     });
 
-    window.addEventListener('online', () => { 
-        document.getElementById('offlineBanner').classList.remove('show'); 
-        API.sync(); 
-    });
-    
+    window.addEventListener('online', () => { document.getElementById('offlineBanner').classList.remove('show'); API.sync(); });
     window.addEventListener('offline', () => document.getElementById('offlineBanner').classList.add('show'));
-    
     window.onload = () => { 
-        UI.render(); 
-        API.sync(); 
-        
-        // Trigger event UI awal dari Global Store
-        if(window.PrinterStore && window.PrinterStore.getStatus()){
-            const icon = document.getElementById('iconBT');
-            if(icon) {
-                icon.classList.replace('text-muted', 'text-primary');
-                document.getElementById('btnBTIndicator').title = `Terhubung: ${window.PrinterStore.getDeviceName()}`;
-            }
+        UI.render(); API.sync(); 
+        if (window.PrinterStore) {
+            window.dispatchEvent(new CustomEvent('printerStatus', { detail: { connected: window.PrinterStore.getStatus(), connecting: window.PrinterStore.isConnecting(), name: window.PrinterStore.getDeviceName() } }));
         }
     };
 </script>
-
 {% endblock %}

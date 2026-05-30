@@ -13,7 +13,6 @@
 
 <form id="formPengaturan" onsubmit="event.preventDefault(); handleSave();">
     <div class="row g-4">
-        
         <div class="col-lg-7">
             <div class="card border-0 shadow-sm rounded-4 h-100">
                 <div class="card-header bg-white border-bottom-0 pt-4 pb-0 px-4">
@@ -45,7 +44,6 @@
         </div>
 
         <div class="col-lg-5 d-flex flex-column gap-4">
-            
             <div class="card border-0 shadow-sm rounded-4">
                 <div class="card-header bg-white border-bottom-0 pt-4 pb-0 px-4">
                     <h5 class="fw-bold mb-0"><i class="bi bi-calculator text-danger me-2"></i>Pajak & Biaya</h5>
@@ -115,7 +113,6 @@
                     </div>
                 </div>
             </div>
-
         </div>
     </div>
     
@@ -125,9 +122,6 @@
 </form>
 
 <script>
-    // ==========================================
-    // LOGIKA PENYIMPANAN DATA
-    // ==========================================
     function handleSave(isAutoSave = false) {
         const btnHeader = document.getElementById('btnSaveHeader');
         const btnMobile = document.getElementById('btnSaveMobile');
@@ -148,15 +142,13 @@
             pajak_pb1: parseInt(document.getElementById('pajakPb1').value) || 0,
             service_charge: parseInt(document.getElementById('serviceCharge').value) || 0,
             is_tax_included: document.getElementById('pajakTermasuk').checked ? 1 : 0,
-            printer: document.getElementById('useBluetooth').checked ? 'BT-Printer-58mm' : '', // Sync dg kasir.html
+            printer: document.getElementById('useBluetooth').checked ? 'BT-Printer-58mm' : '',
             is_cash_active: document.getElementById('toggleTunai').checked ? 1 : 0,
             is_qris_active: document.getElementById('toggleQris').checked ? 1 : 0
         };
 
         fetch('/api/pengaturan', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
         })
         .then(response => response.json())
         .then(data => {
@@ -164,21 +156,12 @@
                 btnHeader.innerHTML = '<i class="bi bi-check-circle me-2"></i>Tersimpan';
                 btnHeader.classList.replace('btn-danger', 'btn-success');
                 if (btnMobile) { btnMobile.innerHTML = 'TERSIMPAN'; btnMobile.classList.replace('btn-danger', 'btn-success'); }
-                
                 setTimeout(() => {
-                    btnHeader.innerHTML = originalTextHeader;
-                    btnHeader.classList.replace('btn-success', 'btn-danger');
-                    btnHeader.disabled = false;
-                    if (btnMobile) {
-                        btnMobile.innerHTML = originalTextMobile;
-                        btnMobile.classList.replace('btn-success', 'btn-danger');
-                        btnMobile.disabled = false;
-                    }
+                    btnHeader.innerHTML = originalTextHeader; btnHeader.classList.replace('btn-success', 'btn-danger'); btnHeader.disabled = false;
+                    if (btnMobile) { btnMobile.innerHTML = originalTextMobile; btnMobile.classList.replace('btn-success', 'btn-danger'); btnMobile.disabled = false; }
                 }, 2000);
             }
-        })
-        .catch(error => {
-            console.error('Error:', error);
+        }).catch(error => {
             if(!isAutoSave) alert('Gagal menyimpan pengaturan. Periksa koneksi Anda.');
             if (!isAutoSave) {
                 btnHeader.innerHTML = originalTextHeader; btnHeader.disabled = false;
@@ -187,41 +170,38 @@
         });
     }
 
-    // ==========================================
-    // LOGIKA KONEKSI GLOBAL PRINTER UI
-    // ==========================================
     const btnConnect = document.getElementById('btnConnectBT');
     const btnDisconnect = document.getElementById('btnDisconnectBT');
     const statusLabel = document.getElementById('btStatusLabel');
 
-    function updateBTUI(connected, name) {
-        if(connected) {
-            statusLabel.innerHTML = `<i class="bi bi-circle-fill text-success small me-2"></i>Online (${name})`;
-            statusLabel.classList.replace('text-danger', 'text-success');
+    window.addEventListener('printerStatus', (e) => {
+        const { connected, connecting, name } = e.detail;
+        if(connecting) {
+            statusLabel.innerHTML = `<span class="spinner-border spinner-border-sm text-warning me-2"></span>Menyambungkan...`;
+            statusLabel.className = 'fw-black text-warning';
+            btnConnect.disabled = true; btnDisconnect.disabled = true;
+        } else if(connected) {
+            statusLabel.innerHTML = `<i class="bi bi-circle-fill small me-2"></i>Online (${name})`;
+            statusLabel.className = 'fw-black text-success';
             btnConnect.disabled = true; btnDisconnect.disabled = false;
         } else {
-            statusLabel.innerHTML = `<i class="bi bi-circle-fill text-danger small me-2"></i>Offline`;
-            statusLabel.classList.replace('text-success', 'text-danger');
+            statusLabel.innerHTML = `<i class="bi bi-circle-fill small me-2"></i>Offline`;
+            statusLabel.className = 'fw-black text-danger';
             btnConnect.disabled = false; btnDisconnect.disabled = true;
         }
-    }
-
-    // Tangkap sinyal reaktif dari PrinterStore di layout.html
-    window.addEventListener('printerStatus', (e) => updateBTUI(e.detail.connected, e.detail.name));
+    });
     
-    // Inisialisasi UI awal dengan pengecekan aman
     if (window.PrinterStore) {
-        updateBTUI(window.PrinterStore.getStatus(), window.PrinterStore.getDeviceName());
+        window.dispatchEvent(new CustomEvent('printerStatus', { detail: { connected: window.PrinterStore.getStatus(), connecting: window.PrinterStore.isConnecting(), name: window.PrinterStore.getDeviceName() } }));
     }
 
     if (btnConnect) {
         btnConnect.addEventListener('click', async () => {
             if (!window.PrinterStore) return alert("Sistem Bluetooth belum termuat sepenuhnya. Coba refresh halaman.");
             try {
-                btnConnect.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Memproses...`;
+                btnConnect.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Meminta Izin...`;
                 btnConnect.disabled = true;
                 await window.PrinterStore.connect();
-                // Otomatis nyalakan toggle "Gunakan Bluetooth" dan save background
                 document.getElementById('useBluetooth').checked = true;
                 handleSave(true);
             } catch(e) {
@@ -237,7 +217,6 @@
         btnDisconnect.addEventListener('click', () => {
             if (window.PrinterStore) {
                 window.PrinterStore.disconnect();
-                // Jika diputus manual, sekalian matikan toggle agar beralih ke mode PDF
                 document.getElementById('useBluetooth').checked = false;
                 handleSave(true);
             }

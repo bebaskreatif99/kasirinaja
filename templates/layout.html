@@ -53,7 +53,6 @@
         <ul class="nav flex-column mb-auto gap-2" id="navMenu"></ul>
         
         <div class="mt-auto pt-3 border-top d-flex flex-column gap-3 overflow-hidden" style="overflow: visible !important;">
-            
             <div class="form-check form-switch px-2 d-flex align-items-center gap-2">
                 <input class="form-check-input m-0 cursor-pointer fs-5" type="checkbox" role="switch" id="darkModeToggle">
                 <label class="form-check-label fw-semibold small text-muted cursor-pointer d-flex align-items-center gap-2" for="darkModeToggle">
@@ -62,7 +61,6 @@
                     <span class="theme-text">Mode Gelap</span>
                 </label>
             </div>
-            
             <div class="dropup w-100">
                 <div class="user-box profile-card d-flex align-items-center justify-content-between bg-light p-2 rounded-4 border dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
                     <div class="d-flex align-items-center gap-3 overflow-hidden">
@@ -80,10 +78,8 @@
                     <li><a class="dropdown-item fw-semibold rounded-3 py-2 cursor-pointer" data-bs-toggle="modal" data-bs-target="#modalGantiPasswordGlobal"><i class="bi bi-key me-2 text-warning"></i> Ganti Password</a></li>
                 </ul>
             </div>
-
             <button class="btn btn-outline-danger fw-bold rounded-3 py-2 btn-logout d-flex align-items-center justify-content-center gap-2" data-bs-toggle="modal" data-bs-target="#modalLogout">
-                <i class="bi bi-box-arrow-right fs-5"></i>
-                <span>Keluar</span>
+                <i class="bi bi-box-arrow-right fs-5"></i><span>Keluar</span>
             </button>
         </div>
     </nav>
@@ -95,7 +91,6 @@
         </div>
         <div class="offcanvas-body p-3 d-flex flex-column">
             <ul class="nav flex-column mb-auto gap-2" id="navMenuMobile"></ul>
-            
             <div class="mt-auto pt-3 border-top d-flex flex-column gap-3">
                 <div class="user-box d-flex align-items-center gap-3 bg-light p-2 rounded-4 border">
                     <div class="bg-danger text-white rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 fw-bold fs-5 text-uppercase" style="width: 40px; height: 40px;">
@@ -118,7 +113,6 @@
     </div>
 
     <main class="content-area flex-grow-1 position-relative w-100 overflow-y-auto pb-5">
-        
         <div class="position-absolute top-0 end-0 p-3 z-3 w-100" style="max-width: 400px;">
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
@@ -132,7 +126,6 @@
                 {% endif %}
             {% endwith %}
         </div>
-
         {% block content %}{% endblock %}
     </main>
 
@@ -168,43 +161,34 @@
                     <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" id="btnCloseGlobalPassModal"></button>
                 </div>
                 <div class="modal-body p-3">
-                    
                     <div id="globalPassAlertBox" class="d-none alert rounded-3 small fw-bold mb-3"></div>
-
                     <form id="formGantiPasswordGlobal">
                         <div class="mb-3">
                             <label class="form-label text-muted small fw-bold">Password Saat Ini</label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light border-end-0"><i class="bi bi-lock text-muted"></i></span>
-                                <input type="password" id="gOldPassword" class="form-control shadow-none bg-light border-start-0 border-end-0" placeholder="Ketik password lama" required>
-                                <button class="btn btn-light bg-light border border-start-0 toggle-gpass" type="button" tabindex="-1"><i class="bi bi-eye-slash text-muted"></i></button>
+                                <input type="password" id="gOldPassword" class="form-control shadow-none bg-light border-start-0 border-end-0" required>
+                                <button class="btn btn-light bg-light border border-start-0 toggle-gpass" type="button"><i class="bi bi-eye-slash text-muted"></i></button>
                             </div>
                         </div>
-
                         <div class="mb-3">
                             <label class="form-label text-muted small fw-bold">Password Baru</label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light border-end-0"><i class="bi bi-key text-muted"></i></span>
-                                <input type="password" id="gNewPassword" class="form-control shadow-none bg-light border-start-0 border-end-0" placeholder="Minimal 6 karakter" required minlength="6">
-                                <button class="btn btn-light bg-light border border-start-0 toggle-gpass" type="button" tabindex="-1"><i class="bi bi-eye-slash text-muted"></i></button>
+                                <input type="password" id="gNewPassword" class="form-control shadow-none bg-light border-start-0 border-end-0" required minlength="6">
+                                <button class="btn btn-light bg-light border border-start-0 toggle-gpass" type="button"><i class="bi bi-eye-slash text-muted"></i></button>
                             </div>
                         </div>
-
                         <div class="mb-4">
                             <label class="form-label text-muted small fw-bold">Ulangi Password Baru</label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light border-end-0"><i class="bi bi-shield-check text-muted"></i></span>
-                                <input type="password" id="gConfirmPassword" class="form-control shadow-none bg-light border-start-0 border-end-0" placeholder="Konfirmasi password baru" required>
-                                <button class="btn btn-light bg-light border border-start-0 toggle-gpass" type="button" tabindex="-1"><i class="bi bi-eye-slash text-muted"></i></button>
+                                <input type="password" id="gConfirmPassword" class="form-control shadow-none bg-light border-start-0 border-end-0" required>
+                                <button class="btn btn-light bg-light border border-start-0 toggle-gpass" type="button"><i class="bi bi-eye-slash text-muted"></i></button>
                             </div>
-                            <div id="gPassMatchError" class="text-danger small mt-1 d-none fw-semibold">
-                                <i class="bi bi-exclamation-circle me-1"></i>Kombinasi password baru tidak cocok!
-                            </div>
+                            <div id="gPassMatchError" class="text-danger small mt-1 d-none fw-semibold">Kombinasi password tidak cocok!</div>
                         </div>
-
-                        <button type="submit" id="btnSimpanPasswordGlobal" class="btn btn-danger w-100 fw-bold py-2.5 rounded-pill" disabled>
-                            Perbarui Password <i class="bi bi-check2-circle ms-1"></i>
-                        </button>
+                        <button type="submit" id="btnSimpanPasswordGlobal" class="btn btn-danger w-100 fw-bold py-2.5 rounded-pill" disabled>Perbarui Password</button>
                     </form>
                 </div>
             </div>
@@ -214,11 +198,9 @@
     <div class="modal fade" id="modalLogout" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-sm">
             <div class="modal-content rounded-4 border-0 shadow-lg text-center p-4">
-                <div class="mb-3">
-                    <i class="bi bi-exclamation-circle text-warning" style="font-size: 4rem;"></i>
-                </div>
+                <div class="mb-3"><i class="bi bi-exclamation-circle text-warning" style="font-size: 4rem;"></i></div>
                 <h5 class="fw-bold">Tutup Shift & Keluar?</h5>
-                <p class="text-muted small mb-4">Apakah Anda yakin ingin mengakhiri sesi ini? Pastikan rekonsiliasi kas sudah selesai.</p>
+                <p class="text-muted small mb-4">Pastikan rekonsiliasi kas sudah selesai.</p>
                 <div class="d-flex gap-2">
                     <button type="button" class="btn btn-light fw-bold w-50 rounded-pill border" data-bs-dismiss="modal">Batal</button>
                     <a href="/logout" class="btn btn-danger fw-bold w-50 rounded-pill">Ya, Keluar</a>
@@ -231,7 +213,6 @@
     
     <script>
         const currentPath = location.pathname;
-        
         let navLinks = `
             <li class="nav-item"><a class="nav-link fw-semibold ${currentPath==='/pos'?'active':''}" href="/pos"><i class="bi bi-calculator"></i> <span class="menu-text">Mesin Kasir</span></a></li>
             <li class="nav-item"><a class="nav-link fw-semibold ${currentPath==='/produk'?'active':''}" href="/produk"><i class="bi bi-box-seam"></i> <span class="menu-text">Kelola Produk</span></a></li>
@@ -240,18 +221,9 @@
             <li class="nav-item"><a class="nav-link fw-semibold ${currentPath==='/laporan'?'active':''}" href="/laporan"><i class="bi bi-journal-text"></i> <span class="menu-text">Laporan Pembukuan</span></a></li>
             <li class="nav-item"><a class="nav-link fw-semibold ${currentPath==='/pengaturan'?'active':''}" href="/pengaturan"><i class="bi bi-gear"></i> <span class="menu-text">Pengaturan Toko</span></a></li>
         `;
-
         {% if session.get('role') == 'SuperAdmin' %}
-        navLinks += `
-            <hr class="my-2 opacity-10">
-            <li class="nav-item mt-2">
-                <a class="nav-link fw-bold ${currentPath==='/admin_saas'?'active':''}" href="/admin_saas" style="color: #6f42c1; background-color: rgba(111, 66, 193, 0.1);">
-                    <i class="bi bi-shield-lock-fill"></i> <span class="menu-text">Panel SuperAdmin 👑</span>
-                </a>
-            </li>
-        `;
+        navLinks += `<hr class="my-2 opacity-10"><li class="nav-item mt-2"><a class="nav-link fw-bold ${currentPath==='/admin_saas'?'active':''}" href="/admin_saas" style="color: #6f42c1; background-color: rgba(111, 66, 193, 0.1);"><i class="bi bi-shield-lock-fill"></i> <span class="menu-text">Panel SuperAdmin 👑</span></a></li>`;
         {% endif %}
-
         document.getElementById('navMenu').innerHTML = navLinks;
         document.getElementById('navMenuMobile').innerHTML = navLinks;
 
@@ -259,11 +231,8 @@
             const sidebar = document.getElementById('sidebarDesktop');
             const icon = document.getElementById('toggleIcon');
             sidebar.classList.toggle('sidebar-collapsed');
-            if(sidebar.classList.contains('sidebar-collapsed')) {
-                icon.classList.replace('bi-chevron-left', 'bi-chevron-right');
-            } else {
-                icon.classList.replace('bi-chevron-right', 'bi-chevron-left');
-            }
+            if(sidebar.classList.contains('sidebar-collapsed')) icon.classList.replace('bi-chevron-left', 'bi-chevron-right');
+            else icon.classList.replace('bi-chevron-right', 'bi-chevron-left');
         }
 
         const darkModeToggle = document.getElementById('darkModeToggle');
@@ -273,36 +242,20 @@
         function applyTheme(theme) {
             document.documentElement.setAttribute('data-bs-theme', theme);
             if(theme === 'dark') {
-                darkModeToggle.checked = true;
-                lightIcon.classList.add('d-none');
-                darkIcon.classList.remove('d-none');
+                darkModeToggle.checked = true; lightIcon.classList.add('d-none'); darkIcon.classList.remove('d-none');
             } else {
-                darkModeToggle.checked = false;
-                lightIcon.classList.remove('d-none');
-                darkIcon.classList.add('d-none');
+                darkModeToggle.checked = false; lightIcon.classList.remove('d-none'); darkIcon.classList.add('d-none');
             }
         }
-
         if (localStorage.getItem('theme') === 'dark') applyTheme('dark');
         darkModeToggle.addEventListener('change', () => {
             const theme = darkModeToggle.checked ? 'dark' : 'light';
-            localStorage.setItem('theme', theme);
-            applyTheme(theme);
+            localStorage.setItem('theme', theme); applyTheme(theme);
         });
     </script>
 
     <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/static/sw.js')
-            .then(registration => {
-              console.log('ServiceWorker sukses didaftarkan dengan scope: ', registration.scope);
-            })
-            .catch(err => {
-              console.log('ServiceWorker gagal didaftarkan: ', err);
-            });
-        });
-      }
+      if ('serviceWorker' in navigator) navigator.serviceWorker.register('/static/sw.js');
     </script>
 
     <script>
@@ -311,29 +264,39 @@
         let server = null;
         let charWrite = null;
         let isConnected = false;
+        let isConnecting = false;
 
         function dispatchStatus() {
             window.dispatchEvent(new CustomEvent('printerStatus', {
-                detail: { connected: isConnected, name: device ? device.name : '' }
+                detail: { connected: isConnected, connecting: isConnecting, name: device ? device.name : '' }
             }));
         }
 
         async function initGATT(btDevice) {
-            device = btDevice;
-            device.addEventListener('gattserverdisconnected', handleDisconnect);
-            
-            server = await device.gatt.connect();
-            const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
-            const chars = await service.getCharacteristics();
-            
-            for (const c of chars) {
-                if (c.properties.write || c.properties.writeWithoutResponse) {
-                    charWrite = c; break;
+            isConnecting = true; dispatchStatus();
+            try {
+                device = btDevice;
+                device.addEventListener('gattserverdisconnected', handleDisconnect);
+                server = await device.gatt.connect();
+                const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+                const chars = await service.getCharacteristics();
+                
+                for (const c of chars) {
+                    if (c.properties.write || c.properties.writeWithoutResponse) {
+                        charWrite = c; break;
+                    }
                 }
+                if (!charWrite) throw new Error("Tidak ada akses Write.");
+                
+                isConnected = true;
+                localStorage.setItem('bt_paired', '1'); // Ingatan Abadi
+            } catch(e) {
+                isConnected = false;
+                throw e;
+            } finally {
+                isConnecting = false;
+                dispatchStatus();
             }
-            if (!charWrite) throw new Error("Tidak ada akses Write pada printer ini.");
-            isConnected = true;
-            dispatchStatus();
         }
 
         async function connect() {
@@ -344,36 +307,61 @@
         }
 
         async function autoConnect() {
-            if (navigator.bluetooth && navigator.bluetooth.getDevices) {
+            // Hanya auto-connect jika sebelumnya sudah pernah pairing sukses
+            if (localStorage.getItem('bt_paired') === '1' && navigator.bluetooth && navigator.bluetooth.getDevices) {
+                isConnecting = true; dispatchStatus();
                 try {
                     const devices = await navigator.bluetooth.getDevices();
                     if (devices.length > 0) {
-                        console.log("♻️ Memulihkan koneksi printer (Keep-Alive)...");
+                        console.log("♻️ Auto-reconnect background...");
                         await initGATT(devices[0]);
+                    } else {
+                        isConnecting = false; dispatchStatus();
                     }
-                } catch(e) { console.warn("Auto-connect background gagal:", e); }
+                } catch(e) {
+                    console.warn("Auto-connect gagal:", e);
+                    isConnecting = false; dispatchStatus();
+                }
             }
         }
 
         function handleDisconnect() {
             isConnected = false; charWrite = null; dispatchStatus();
-            console.warn("⚠️ Printer terputus! Mencoba auto-reconnect dalam 3 detik...");
             setTimeout(async () => {
-                if (device) {
-                    try { await initGATT(device); console.log("✅ Auto-reconnect sukses!"); }
-                    catch(e) { console.error("Auto-reconnect gagal", e); }
+                if (device && localStorage.getItem('bt_paired') === '1') {
+                    try { await initGATT(device); } catch(e) {}
                 }
             }, 3000);
         }
 
         function disconnect() {
+            localStorage.removeItem('bt_paired'); // Hapus ingatan
             if (device && device.gatt.connected) device.gatt.disconnect();
-            device = null; server = null; charWrite = null; isConnected = false;
+            device = null; server = null; charWrite = null; 
+            isConnected = false; isConnecting = false;
             dispatchStatus();
         }
 
+        async function ensureConnection() {
+            if (isConnected && charWrite) return true;
+            
+            // Bypass pintar: Pancing koneksi diam-diam tanpa pop-up
+            if (navigator.bluetooth && navigator.bluetooth.getDevices) {
+                const devices = await navigator.bluetooth.getDevices();
+                if (devices.length > 0) {
+                    await initGATT(devices[0]);
+                    return true;
+                }
+            }
+            // Jika memori kosong, paksa munculkan pop-up izin
+            await connect();
+            return true;
+        }
+
         async function print(escposData) {
-            if (!isConnected || !charWrite) throw new Error("Printer belum terhubung! Silakan setel di menu Pengaturan.");
+            // Trik Cerdas: Jamin koneksi otomatis menyambung sebelum print!
+            await ensureConnection();
+
             const CHUNK_SIZE = 512;
             let offset = 0;
             while (offset < escposData.length) {
@@ -391,10 +379,9 @@
         window.addEventListener('load', autoConnect);
 
         return { 
-            connect, 
-            disconnect, 
-            print, 
+            connect, disconnect, print, 
             getStatus: () => isConnected, 
+            isConnecting: () => isConnecting,
             getDeviceName: () => device ? device.name : '' 
         };
     })();
@@ -428,18 +415,14 @@
             const oldVal = oldPassG.value.trim();
             const newVal = newPassG.value.trim();
             const confVal = confPassG.value.trim();
-
             const isFilled = oldVal.length > 0 && newVal.length >= 6 && confVal.length > 0;
             const isMatch = newVal === confVal;
 
             if (confVal.length > 0 && !isMatch) {
-                matchErrorG.classList.remove('d-none');
-                confPassG.classList.add('is-invalid');
+                matchErrorG.classList.remove('d-none'); confPassG.classList.add('is-invalid');
             } else {
-                matchErrorG.classList.add('d-none');
-                confPassG.classList.remove('is-invalid');
+                matchErrorG.classList.add('d-none'); confPassG.classList.remove('is-invalid');
             }
-
             btnSimpanG.disabled = !(isFilled && isMatch);
         }
 
@@ -450,16 +433,13 @@
         });
 
         document.getElementById('modalGantiPasswordGlobal').addEventListener('hidden.bs.modal', function () {
-            formG.reset();
-            alertBoxG.className = 'd-none';
+            formG.reset(); alertBoxG.className = 'd-none';
             matchErrorG.className = 'text-danger small mt-1 d-none fw-semibold';
-            confPassG.classList.remove('is-invalid');
-            validateGlobalPasswordForm();
+            confPassG.classList.remove('is-invalid'); validateGlobalPasswordForm();
         });
 
         formG.addEventListener('submit', async function(e) {
             e.preventDefault();
-            
             if (!oldPassG.value.trim() || !newPassG.value.trim()) {
                 alertBoxG.className = 'alert alert-warning rounded-3 small fw-bold mb-3 animate-bounce';
                 alertBoxG.innerHTML = `<i class="bi bi-shield-fill-exclamation me-2"></i> Kolom tidak boleh hanya berisi spasi!`;
@@ -468,45 +448,30 @@
 
             const originalText = btnSimpanG.innerHTML;
             btnSimpanG.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span> Memproses...`;
-            btnSimpanG.disabled = true;
-            alertBoxG.className = 'd-none';
+            btnSimpanG.disabled = true; alertBoxG.className = 'd-none';
 
             try {
                 const response = await fetch('/api/settings/change-password', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        oldPassword: oldPassG.value,
-                        newPassword: newPassG.value
-                    })
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ oldPassword: oldPassG.value, newPassword: newPassG.value })
                 });
-
                 const data = await response.json();
 
                 if (response.ok && data.status === 'success') {
                     alertBoxG.className = 'alert alert-success rounded-3 small fw-bold mb-3';
                     alertBoxG.innerHTML = `<i class="bi bi-check-circle-fill me-2 text-success fs-5 align-middle"></i> ${data.message}`;
-                    formG.reset();
-                    validateGlobalPasswordForm();
-
-                    setTimeout(() => {
-                        alertBoxG.className = 'd-none';
-                        bootstrap.Modal.getInstance(document.getElementById('modalGantiPasswordGlobal')).hide();
-                    }, 1500);
-
+                    formG.reset(); validateGlobalPasswordForm();
+                    setTimeout(() => { alertBoxG.className = 'd-none'; bootstrap.Modal.getInstance(document.getElementById('modalGantiPasswordGlobal')).hide(); }, 1500);
                 } else {
                     alertBoxG.className = 'alert alert-danger rounded-3 small fw-bold mb-3';
                     alertBoxG.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-2 text-danger fs-5 align-middle"></i> ${data.message}`;
-                    btnSimpanG.innerHTML = originalText;
-                    btnSimpanG.disabled = false;
-                    oldPassG.value = '';
-                    oldPassG.focus();
+                    btnSimpanG.innerHTML = originalText; btnSimpanG.disabled = false;
+                    oldPassG.value = ''; oldPassG.focus();
                 }
             } catch (error) {
                 alertBoxG.className = 'alert alert-warning rounded-3 small fw-bold mb-3';
                 alertBoxG.innerHTML = `<i class="bi bi-wifi-off me-2 text-warning fs-5 align-middle"></i> Jaringan gagal merespon. Coba beberapa saat lagi.`;
-                btnSimpanG.innerHTML = originalText;
-                btnSimpanG.disabled = false;
+                btnSimpanG.innerHTML = originalText; btnSimpanG.disabled = false;
             }
         });
     });
