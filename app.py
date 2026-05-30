@@ -10,13 +10,6 @@ from flask_limiter.util import get_remote_address
 import psycopg2
 from psycopg2.extras import DictCursor
 
-# Load dotenv untuk environment lokal VS Code (Aman diabaikan oleh Vercel)
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    pass
-
 app = Flask(__name__)
 app.secret_key = 'kasirinaja_saas_super_secret_2026' 
 
@@ -260,8 +253,8 @@ def kasir():
     cur.execute("SELECT * FROM produk WHERE tenant_id = %s AND status = 'Aktif'", (session['tenant_id'],))
     produk = cur.fetchall()
     
-    # PERBAIKAN SINKRONISASI PRINTER: Memanggil field 'printer' dari database
-    cur.execute('SELECT is_cash_active, is_qris_active, printer FROM pengaturan WHERE tenant_id = %s', (session['tenant_id'],))
+    # PERBAIKAN: Mengambil SEMUA (*) pengaturan agar kasir.html bisa merender nama, alamat, footer struk
+    cur.execute('SELECT * FROM pengaturan WHERE tenant_id = %s', (session['tenant_id'],))
     setting = cur.fetchone()
     
     cur.close(); conn.close()
@@ -366,35 +359,6 @@ def pengaturan():
     setting = cur.fetchone()    
     cur.close(); conn.close()
     return render_template('pengaturan.html', setting=setting)
-
-# PERBAIKAN: Penambahan route /api/pengaturan yang esensial agar data dapat disimpan ke database
-@app.route('/api/pengaturan', methods=['POST'])
-@login_required
-def api_pengaturan():
-    data = request.get_json()
-    conn = get_db_connection()
-    try:
-        cur = conn.cursor()
-        cur.execute('''UPDATE pengaturan 
-                       SET nama_toko=%s, kontak=%s, alamat=%s, footer=%s, 
-                           pajak_pb1=%s, service_charge=%s, is_tax_included=%s, 
-                           printer=%s, is_cash_active=%s, is_qris_active=%s 
-                       WHERE tenant_id=%s''', 
-                    (data.get('nama_toko'), data.get('kontak'), data.get('alamat'), data.get('footer'),
-                     data.get('pajak_pb1'), data.get('service_charge'), data.get('is_tax_included'),
-                     data.get('printer'), data.get('is_cash_active'), data.get('is_qris_active'), session['tenant_id']))
-        
-        # Sinkronkan juga nama toko di tabel tenants jika user memperbaruinya
-        cur.execute('UPDATE tenants SET nama_toko=%s WHERE id=%s', (data.get('nama_toko'), session['tenant_id']))
-        
-        conn.commit()
-        return jsonify({"status": "success", "message": "Pengaturan disimpan"}), 200
-    except Exception as e:
-        conn.rollback()
-        return jsonify({"status": "error", "message": str(e)}), 500
-    finally:
-        cur.close()
-        conn.close()
 
 @app.route('/api/settings/change-password', methods=['POST'])
 @login_required
