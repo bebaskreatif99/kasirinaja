@@ -10,6 +10,13 @@ from flask_limiter.util import get_remote_address
 import psycopg2
 from psycopg2.extras import DictCursor
 
+# Load dotenv untuk environment lokal VS Code
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 app = Flask(__name__)
 app.secret_key = 'kasirinaja_saas_super_secret_2026' 
 
@@ -78,7 +85,26 @@ def init_db():
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''', 
                      (1, 'KasirinAja HQ', '0800-0000-0000', 'Cloud Server', 'Terima kasih!', 0, 0, 0, 'BT-Printer-58mm', 1, 1))
 
-    conn.commit()
+    conn.commit() # Simpan tabel utama
+    
+    # -------------------------------------------------------------
+    # SISTEM AUTO-PATCHING (MIGRASI DATABASE LAMA KE BARU)
+    # Menyuntikkan kolom baru jika database sebelumnya sudah ada
+    # -------------------------------------------------------------
+    kolom_tambahan = [
+        ("pengaturan", "printer", "TEXT DEFAULT 'BT-Printer-58mm'"),
+        ("pengaturan", "is_cash_active", "INTEGER DEFAULT 1"),
+        ("pengaturan", "is_qris_active", "INTEGER DEFAULT 1"),
+        ("pengaturan", "is_tax_included", "INTEGER DEFAULT 0")
+    ]
+    
+    for tabel, kolom, tipe in kolom_tambahan:
+        try:
+            cur.execute(f"ALTER TABLE {tabel} ADD COLUMN {kolom} {tipe}")
+            conn.commit()
+        except psycopg2.Error:
+            conn.rollback() # Abaikan dengan damai jika kolom sudah ada
+            
     cur.close()
     conn.close()
 
@@ -105,15 +131,15 @@ def generate_random_password(length=8):
     return ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(length))
 
 # ==========================================
-# RUTE INSTALASI (KHUSUS VERCEL)
+# RUTE INSTALASI / PEMBARUAN (KHUSUS VERCEL)
 # ==========================================
 @app.route('/setup')
 def setup():
     try:
         init_db()
-        return "<h1>✅ DATABASE BERHASIL DIBUAT!</h1><p>Tabel dan akun SuperAdmin telah diinjeksi ke Neon.tech. Silakan <a href='/login'>klik di sini untuk Login</a>.</p>"
+        return "<h1>✅ DATABASE BERHASIL DIPERBARUI!</h1><p>Kolom baru telah disuntikkan ke Neon.tech. Silakan kembali ke aplikasi Anda.</p>"
     except Exception as e:
-        return f"<h1>❌ GAGAL MEMBUAT DATABASE:</h1><p>Error Detail: {str(e)}</p>"
+        return f"<h1>❌ GAGAL MEMPERBARUI DATABASE:</h1><p>Error Detail: {str(e)}</p>"
 
 # ==========================================
 # RUTE APLIKASI SAAS
@@ -253,7 +279,6 @@ def kasir():
     cur.execute("SELECT * FROM produk WHERE tenant_id = %s AND status = 'Aktif'", (session['tenant_id'],))
     produk = cur.fetchall()
     
-    # PERBAIKAN: Mengambil SEMUA (*) pengaturan agar kasir.html bisa merender nama, alamat, footer struk
     cur.execute('SELECT * FROM pengaturan WHERE tenant_id = %s', (session['tenant_id'],))
     setting = cur.fetchone()
     
@@ -360,6 +385,34 @@ def pengaturan():
     cur.close(); conn.close()
     return render_template('pengaturan.html', setting=setting)
 
+@app.route('/api/pengaturan', methods=['POST'])
+@login_required
+def api_pengaturan():
+    try:
+        data = request.get_json()
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute('''UPDATE pengaturan 
+                       SET nama_toko=%s, kontak=%s, alamat=%s, footer=%s, 
+                           pajak_pb1=%s, service_charge=%s, is_tax_included=%s, 
+                           printer=%s, is_cash_active=%s, is_qris_active=%s 
+                       WHERE tenant_id=%s''', 
+                    (data.get('nama_toko'), data.get('kontak'), data.get('alamat'), data.get('footer'),
+                     data.get('pajak_pb1'), data.get('service_charge'), data.get('is_tax_included'),
+                     data.get('printer'), data.get('is_cash_active'), data.get('is_qris_active'), session['tenant_id']))
+        
+        cur.execute('UPDATE tenants SET nama_toko=%s WHERE id=%s', (data.get('nama_toko'), session['tenant_id']))
+        conn.commit()
+        return jsonify({"status": "success", "message": "Pengaturan disimpan"}), 200
+    except Exception as e:
+        if 'conn' in locals() and conn:
+            conn.rollback()
+        print(f"🔥 ERROR SIMPAN PENGATURAN: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        if 'cur' in locals() and cur: cur.close()
+        if 'conn' in locals() and conn: conn.close()
+
 @app.route('/api/settings/change-password', methods=['POST'])
 @login_required
 def api_change_password():
@@ -370,8 +423,8 @@ def api_change_password():
     if not old_password or not new_password or len(new_password) < 6:
         return jsonify({"status": "error", "message": "Password baru harus minimal 6 karakter!"}), 400
 
-    conn = get_db_connection()
     try:
+        conn = get_db_connection()
         cur = conn.cursor(cursor_factory=DictCursor)
         cur.execute('SELECT password FROM users WHERE id = %s', (session['user_id'],))
         user = cur.fetchone()
@@ -380,19 +433,18 @@ def api_change_password():
             return jsonify({"status": "error", "message": "Password lama yang Anda masukkan salah!"}), 401
             
         hashed_new_password = generate_password_hash(new_password)
-        
         cur.execute('UPDATE users SET password = %s WHERE id = %s', (hashed_new_password, session['user_id']))
         conn.commit()
         
         return jsonify({"status": "success", "message": "Keamanan diperbarui! Sandi berhasil diganti."}), 200
         
     except Exception as e:
-        conn.rollback()
-        print(f"🔥 ERROR GANTI PASSWORD (POSTGRES): {str(e)}")
+        if 'conn' in locals() and conn: conn.rollback()
+        print(f"🔥 ERROR GANTI PASSWORD: {str(e)}")
         return jsonify({"status": "error", "message": f"Sistem Error: {str(e)}"}), 500
     finally:
-        cur.close()
-        conn.close()
+        if 'cur' in locals() and cur: cur.close()
+        if 'conn' in locals() and conn: conn.close()
 
 @app.route('/bayar', methods=['POST'])
 @login_required
@@ -402,8 +454,9 @@ def bayar():
     keranjang = data.get('keranjang', [])
     tid = session['tenant_id']
     if total < 0 or not keranjang: return jsonify({"status": "error", "message": "Data tidak valid!"}), 400
-    conn = get_db_connection()
+    
     try:
+        conn = get_db_connection()
         cur = conn.cursor(cursor_factory=DictCursor)
         cur.execute('INSERT INTO transaksi (tenant_id, tanggal, total) VALUES (%s, %s, %s) RETURNING id', 
                     (tid, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), total))
@@ -418,9 +471,86 @@ def bayar():
         conn.commit()
         return jsonify({"status": "success", "transaksi_id": transaksi_id})
     except Exception as e:
-        conn.rollback()
+        if 'conn' in locals() and conn: conn.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
-    finally: cur.close(); conn.close()
+    finally: 
+        if 'cur' in locals() and cur: cur.close()
+        if 'conn' in locals() and conn: conn.close()
+
+# ==========================================
+# RUTE BARU: GENERATOR STRUK HTML (Mode PDF)
+# ==========================================
+@app.route('/cetak_struk/<int:trx_id>')
+@login_required
+def cetak_struk(trx_id):
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=DictCursor)
+    
+    cur.execute('SELECT * FROM transaksi WHERE id = %s AND tenant_id = %s', (trx_id, session['tenant_id']))
+    trx = cur.fetchone()
+    
+    if not trx:
+        cur.close(); conn.close()
+        return "<h1>Transaksi tidak ditemukan</h1>", 404
+        
+    cur.execute('''SELECT dt.*, p.nama FROM detail_transaksi dt 
+                   JOIN produk p ON dt.produk_id = p.id 
+                   WHERE dt.transaksi_id = %s''', (trx_id,))
+    items = cur.fetchall()
+    
+    cur.execute('SELECT * FROM pengaturan WHERE tenant_id = %s', (session['tenant_id'],))
+    setting = cur.fetchone()
+    cur.close(); conn.close()
+    
+    nama_toko = setting['nama_toko'].upper() if setting and setting['nama_toko'] else 'KASIRINAJA'
+    alamat = setting['alamat'] if setting and setting['alamat'] else ''
+    kontak = setting['kontak'] if setting and setting['kontak'] else ''
+    footer = setting['footer'] if setting and setting['footer'] else 'TERIMA KASIH'
+    
+    html_items = ""
+    for item in items:
+        html_items += f"""
+        <div class="item">
+            <div>{item['qty']}x {item['nama']}<br><small>@ Rp {item['harga_satuan']:,}</small></div>
+            <div>Rp {item['subtotal']:,}</div>
+        </div>
+        """
+    
+    html_struk = f"""
+    <!DOCTYPE html>
+    <html lang="id">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Cetak Struk #{trx_id}</title>
+        <style>
+            body {{ font-family: 'Courier New', Courier, monospace; color: #000; text-align: center; width: 100%; max-width: 300px; margin: 0 auto; padding: 20px; font-size: 12px; }}
+            .garis {{ border-bottom: 1px dashed #000; margin: 10px 0; }}
+            .item {{ display: flex; justify-content: space-between; text-align: left; margin-bottom: 5px; }}
+            .tebal {{ font-weight: bold; font-size: 14px; }}
+            @media print {{ body {{ padding: 0; margin: 0; width: 100%; }} @page {{ margin: 0; }} }}
+        </style>
+    </head>
+    <body onload="window.print()">
+        <h3 style="margin:0;">{nama_toko}</h3>
+        <p style="margin:5px 0;">{alamat}</p>
+        <p style="margin:5px 0;">Telp/WA: {kontak}</p>
+        <div class="garis"></div>
+        <div style="text-align: left;">
+            Tanggal : {trx['tanggal']}<br>Nota ID : #{trx_id}
+        </div>
+        <div class="garis"></div>
+        {html_items}
+        <div class="garis"></div>
+        <div class="item tebal">
+            <div>TOTAL</div><div>Rp {trx['total']:,}</div>
+        </div>
+        <div class="garis"></div>
+        <p style="white-space: pre-wrap;">{footer}</p>
+    </body>
+    </html>
+    """
+    return html_struk
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
