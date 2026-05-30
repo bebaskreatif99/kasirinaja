@@ -368,33 +368,39 @@ def api_change_password():
     old_password = data.get('oldPassword')
     new_password = data.get('newPassword')
 
+    # Validasi Lapis 1 (Backend)
     if not old_password or not new_password or len(new_password) < 6:
         return jsonify({"status": "error", "message": "Password baru harus minimal 6 karakter!"}), 400
 
     conn = get_db_connection()
     try:
-        # Gunakan conn.execute secara langsung (mengikuti standar app.py Anda)
-        user = conn.execute('SELECT password FROM users WHERE id = ?', (session['user_id'],)).fetchone()
+        # PENTING: PostgreSQL menggunakan Cursor dan DictCursor
+        cur = conn.cursor(cursor_factory=DictCursor)
         
-        # Validasi Lapis 1: Cek Password Lama
+        # PENTING: PostgreSQL menggunakan %s bukan ?
+        cur.execute('SELECT password FROM users WHERE id = %s', (session['user_id'],))
+        user = cur.fetchone()
+        
+        # Cek kecocokan password lama
         if not user or not check_password_hash(user['password'], old_password):
             return jsonify({"status": "error", "message": "Password lama yang Anda masukkan salah!"}), 401
             
-        # Proses Hashing Keamanan Tinggi via Werkzeug Security
+        # Hashing password baru
         hashed_new_password = generate_password_hash(new_password)
         
-        # Simpan ke Database
-        conn.execute('UPDATE users SET password = ? WHERE id = ?', (hashed_new_password, session['user_id']))
+        # Simpan ke Database PostgreSQL (Pakai %s)
+        cur.execute('UPDATE users SET password = %s WHERE id = %s', (hashed_new_password, session['user_id']))
         conn.commit()
         
         return jsonify({"status": "success", "message": "Keamanan diperbarui! Sandi berhasil diganti."}), 200
         
     except Exception as e:
         conn.rollback()
-        # Kita cetak error aslinya ke terminal VS Code dan ke layar pop-up
-        print(f"🔥 ERROR GANTI PASSWORD: {str(e)}")
+        # Cetak error ke log Vercel agar mudah di-debug
+        print(f"🔥 ERROR GANTI PASSWORD (POSTGRES): {str(e)}")
         return jsonify({"status": "error", "message": f"Sistem Error: {str(e)}"}), 500
     finally:
+        cur.close()
         conn.close()
 
 @app.route('/bayar', methods=['POST'])
