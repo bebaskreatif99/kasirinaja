@@ -357,7 +357,7 @@ def pengaturan():
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=DictCursor)
     cur.execute('SELECT * FROM pengaturan WHERE tenant_id = %s', (session['tenant_id'],))
-    setting = cur.fetchone()
+    setting = cur.fetchone()    
     cur.close(); conn.close()
     return render_template('pengaturan.html', setting=setting)
 
@@ -373,9 +373,8 @@ def api_change_password():
 
     conn = get_db_connection()
     try:
-        # Ambil hash user dari DB berdasarkan Sesi Login saat ini
-        cur = conn.cursor()
-        user = cur.execute('SELECT password FROM users WHERE id = ?', (session['user_id'],)).fetchone()
+        # Gunakan conn.execute secara langsung (mengikuti standar app.py Anda)
+        user = conn.execute('SELECT password FROM users WHERE id = ?', (session['user_id'],)).fetchone()
         
         # Validasi Lapis 1: Cek Password Lama
         if not user or not check_password_hash(user['password'], old_password):
@@ -385,14 +384,16 @@ def api_change_password():
         hashed_new_password = generate_password_hash(new_password)
         
         # Simpan ke Database
-        cur.execute('UPDATE users SET password = ? WHERE id = ?', (hashed_new_password, session['user_id']))
+        conn.execute('UPDATE users SET password = ? WHERE id = ?', (hashed_new_password, session['user_id']))
         conn.commit()
         
         return jsonify({"status": "success", "message": "Keamanan diperbarui! Sandi berhasil diganti."}), 200
         
     except Exception as e:
         conn.rollback()
-        return jsonify({"status": "error", "message": "Internal Server Error!"}), 500
+        # Kita cetak error aslinya ke terminal VS Code dan ke layar pop-up
+        print(f"🔥 ERROR GANTI PASSWORD: {str(e)}")
+        return jsonify({"status": "error", "message": f"Sistem Error: {str(e)}"}), 500
     finally:
         conn.close()
 
