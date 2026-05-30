@@ -77,7 +77,7 @@
                 </div>
                 <ul class="dropdown-menu shadow-lg border-0 rounded-4 w-100 mb-2 p-2">
                     <li><a class="dropdown-item fw-semibold rounded-3 py-2 cursor-pointer" data-bs-toggle="modal" data-bs-target="#modalPengaturanAkun"><i class="bi bi-person-gear me-2 text-primary"></i> Pengaturan Akun</a></li>
-                    <li><a class="dropdown-item fw-semibold rounded-3 py-2 cursor-pointer" data-bs-toggle="modal" data-bs-target="#modalGantiPassword"><i class="bi bi-key me-2 text-warning"></i> Ganti Password</a></li>
+                    <li><a class="dropdown-item fw-semibold rounded-3 py-2 cursor-pointer" data-bs-toggle="modal" data-bs-target="#modalGantiPasswordGlobal"><i class="bi bi-key me-2 text-warning"></i> Ganti Password</a></li>
                 </ul>
             </div>
 
@@ -103,7 +103,11 @@
                     </div>
                     <div class="d-flex flex-column">
                         <span class="fw-bold small lh-1 text-dark mb-1">{{ session.get('nama', 'User') }}</span>
-                        <a href="#" class="text-primary small text-decoration-none" data-bs-toggle="modal" data-bs-target="#modalPengaturanAkun">Edit Profil</a>
+                        <div class="d-flex gap-2">
+                            <a href="#" class="text-primary small text-decoration-none" data-bs-toggle="modal" data-bs-target="#modalPengaturanAkun">Edit Profil</a>
+                            <span class="text-muted small">|</span>
+                            <a href="#" class="text-warning fw-semibold small text-decoration-none" data-bs-toggle="modal" data-bs-target="#modalGantiPasswordGlobal">Sandi</a>
+                        </div>
                     </div>
                 </div>
                 <button class="btn btn-danger text-white fw-bold rounded-3 py-2 d-flex align-items-center justify-content-center gap-2" data-bs-toggle="modal" data-bs-target="#modalLogout">
@@ -132,8 +136,6 @@
         {% block content %}{% endblock %}
     </main>
 
-    <!-- Modal Pengaturan Akun & Logout -->
-    <!-- (Modal-modal lainnya tetap sama...) -->
     <div class="modal fade" id="modalPengaturanAkun" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content rounded-4 border-0 shadow text-start p-2">
@@ -158,25 +160,51 @@
         </div>
     </div>
 
-    <div class="modal fade" id="modalGantiPassword" tabindex="-1" aria-hidden="true">
+    <div class="modal fade" id="modalGantiPasswordGlobal" tabindex="-1" data-bs-backdrop="static" style="z-index: 1060;">
         <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content rounded-4 border-0 shadow text-start p-2">
+            <div class="modal-content rounded-4 border-0 shadow-lg p-2">
                 <div class="modal-header border-0 pb-0">
-                    <h5 class="fw-bold mb-0"><i class="bi bi-key text-warning me-2"></i>Ganti Password</h5>
-                    <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal"></button>
+                    <h5 class="modal-title fw-bold text-dark"><i class="bi bi-shield-lock-fill text-danger me-2"></i>Keamanan Akun</h5>
+                    <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" id="btnCloseGlobalPassModal"></button>
                 </div>
-                <div class="modal-body">
-                    <form action="/update_password" method="POST">
+                <div class="modal-body p-3">
+                    
+                    <div id="globalPassAlertBox" class="d-none alert rounded-3 small fw-bold mb-3"></div>
+
+                    <form id="formGantiPasswordGlobal">
                         <div class="mb-3">
-                            <label class="form-label fw-semibold small text-muted">Password Lama</label>
-                            <input type="password" name="password_lama" class="form-control rounded-3 bg-light" required>
+                            <label class="form-label text-muted small fw-bold">Password Saat Ini</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0"><i class="bi bi-lock text-muted"></i></span>
+                                <input type="password" id="gOldPassword" class="form-control shadow-none bg-light border-start-0 border-end-0" placeholder="Ketik password lama" required>
+                                <button class="btn btn-light bg-light border border-start-0 toggle-gpass" type="button" tabindex="-1"><i class="bi bi-eye-slash text-muted"></i></button>
+                            </div>
                         </div>
+
+                        <div class="mb-3">
+                            <label class="form-label text-muted small fw-bold">Password Baru</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0"><i class="bi bi-key text-muted"></i></span>
+                                <input type="password" id="gNewPassword" class="form-control shadow-none bg-light border-start-0 border-end-0" placeholder="Minimal 6 karakter" required minlength="6">
+                                <button class="btn btn-light bg-light border border-start-0 toggle-gpass" type="button" tabindex="-1"><i class="bi bi-eye-slash text-muted"></i></button>
+                            </div>
+                        </div>
+
                         <div class="mb-4">
-                            <label class="form-label fw-semibold small text-muted">Password Baru</label>
-                            <input type="password" name="password_baru" class="form-control rounded-3 bg-light" required>
-                            <div class="form-text small text-danger">Anda harus login ulang setelah mengganti password.</div>
+                            <label class="form-label text-muted small fw-bold">Ulangi Password Baru</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0"><i class="bi bi-shield-check text-muted"></i></span>
+                                <input type="password" id="gConfirmPassword" class="form-control shadow-none bg-light border-start-0 border-end-0" placeholder="Konfirmasi password baru" required>
+                                <button class="btn btn-light bg-light border border-start-0 toggle-gpass" type="button" tabindex="-1"><i class="bi bi-eye-slash text-muted"></i></button>
+                            </div>
+                            <div id="gPassMatchError" class="text-danger small mt-1 d-none fw-semibold">
+                                <i class="bi bi-exclamation-circle me-1"></i>Kombinasi password baru tidak cocok!
+                            </div>
                         </div>
-                        <button type="submit" class="btn btn-warning text-dark w-100 rounded-pill fw-bold">Perbarui Password</button>
+
+                        <button type="submit" id="btnSimpanPasswordGlobal" class="btn btn-danger w-100 fw-bold py-2.5 rounded-pill" disabled>
+                            Perbarui Password <i class="bi bi-check2-circle ms-1"></i>
+                        </button>
                     </form>
                 </div>
             </div>
@@ -200,12 +228,12 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
     <script>
         const currentPath = location.pathname;
         
-        // --- LOGIKA MENU NAVIGASI ---
         let navLinks = `
-            <li class="nav-item"><a class="nav-link fw-semibold ${currentPath==='/'?'active':''}" href="/pos"><i class="bi bi-calculator"></i> <span class="menu-text">Mesin Kasir</span></a></li>
+            <li class="nav-item"><a class="nav-link fw-semibold ${currentPath==='/pos'?'active':''}" href="/pos"><i class="bi bi-calculator"></i> <span class="menu-text">Mesin Kasir</span></a></li>
             <li class="nav-item"><a class="nav-link fw-semibold ${currentPath==='/produk'?'active':''}" href="/produk"><i class="bi bi-box-seam"></i> <span class="menu-text">Kelola Produk</span></a></li>
             <li class="nav-item"><a class="nav-link fw-semibold ${currentPath==='/dashboard'?'active':''}" href="/dashboard"><i class="bi bi-bar-chart-fill"></i> <span class="menu-text">Dashboard Analitik</span></a></li>
             <hr class="my-2 opacity-10">
@@ -213,7 +241,6 @@
             <li class="nav-item"><a class="nav-link fw-semibold ${currentPath==='/pengaturan'?'active':''}" href="/pengaturan"><i class="bi bi-gear"></i> <span class="menu-text">Pengaturan Toko</span></a></li>
         `;
 
-        // INJEKSI JINJA2: Cek apakah user adalah SuperAdmin
         {% if session.get('role') == 'SuperAdmin' %}
         navLinks += `
             <hr class="my-2 opacity-10">
@@ -265,17 +292,137 @@
     </script>
 
     <script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/static/sw.js')
-        .then(registration => {
-          console.log('ServiceWorker sukses didaftarkan dengan scope: ', registration.scope);
-        })
-        .catch(err => {
-          console.log('ServiceWorker gagal didaftarkan: ', err);
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/static/sw.js')
+            .then(registration => {
+              console.log('ServiceWorker sukses didaftarkan dengan scope: ', registration.scope);
+            })
+            .catch(err => {
+              console.log('ServiceWorker gagal didaftarkan: ', err);
+            });
+        });
+      }
+    </script>
+
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const formG = document.getElementById('formGantiPasswordGlobal');
+        const oldPassG = document.getElementById('gOldPassword');
+        const newPassG = document.getElementById('gNewPassword');
+        const confPassG = document.getElementById('gConfirmPassword');
+        const btnSimpanG = document.getElementById('btnSimpanPasswordGlobal');
+        const matchErrorG = document.getElementById('gPassMatchError');
+        const alertBoxG = document.getElementById('globalPassAlertBox');
+
+        // 1. Toggle Show/Hide Mata
+        document.querySelectorAll('.toggle-gpass').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const input = this.previousElementSibling;
+                const icon = this.querySelector('i');
+                if (input.type === "password") {
+                    input.type = "text";
+                    icon.classList.replace('bi-eye-slash', 'bi-eye');
+                } else {
+                    input.type = "password";
+                    icon.classList.replace('bi-eye', 'bi-eye-slash');
+                }
+            });
+        });
+
+        // 2. Validasi Keamanan (Cegah Spasi Kosong & Real-time Matching)
+        function validateGlobalPasswordForm() {
+            const oldVal = oldPassG.value.trim();
+            const newVal = newPassG.value.trim();
+            const confVal = confPassG.value.trim();
+
+            const isFilled = oldVal.length > 0 && newVal.length >= 6 && confVal.length > 0;
+            const isMatch = newVal === confVal;
+
+            if (confVal.length > 0 && !isMatch) {
+                matchErrorG.classList.remove('d-none');
+                confPassG.classList.add('is-invalid');
+            } else {
+                matchErrorG.classList.add('d-none');
+                confPassG.classList.remove('is-invalid');
+            }
+
+            // Kunci tombol sampai semua syarat valid
+            btnSimpanG.disabled = !(isFilled && isMatch);
+        }
+
+        ['input', 'keyup', 'change'].forEach(evt => {
+            oldPassG.addEventListener(evt, validateGlobalPasswordForm);
+            newPassG.addEventListener(evt, validateGlobalPasswordForm);
+            confPassG.addEventListener(evt, validateGlobalPasswordForm);
+        });
+
+        // Bersihkan data otomatis jika user klik (X) untuk tutup modal
+        document.getElementById('modalGantiPasswordGlobal').addEventListener('hidden.bs.modal', function () {
+            formG.reset();
+            alertBoxG.className = 'd-none';
+            matchErrorG.className = 'text-danger small mt-1 d-none fw-semibold';
+            confPassG.classList.remove('is-invalid');
+            validateGlobalPasswordForm();
+        });
+
+        // 3. Eksekusi Pengiriman API (Fetch)
+        formG.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            // Lapis keamanan ekstra mencegah bypass submit kosong
+            if (!oldPassG.value.trim() || !newPassG.value.trim()) {
+                alertBoxG.className = 'alert alert-warning rounded-3 small fw-bold mb-3';
+                alertBoxG.innerHTML = `<i class="bi bi-shield-fill-exclamation me-2"></i> Kolom tidak boleh hanya berisi spasi kosong!`;
+                return;
+            }
+
+            const originalText = btnSimpanG.innerHTML;
+            btnSimpanG.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span> Memproses...`;
+            btnSimpanG.disabled = true;
+            alertBoxG.className = 'd-none';
+
+            try {
+                const response = await fetch('/api/settings/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        oldPassword: oldPassG.value,
+                        newPassword: newPassG.value
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.status === 'success') {
+                    alertBoxG.className = 'alert alert-success rounded-3 small fw-bold mb-3';
+                    alertBoxG.innerHTML = `<i class="bi bi-check-circle-fill me-2 text-success fs-5 align-middle"></i> ${data.message}`;
+                    formG.reset();
+                    validateGlobalPasswordForm();
+
+                    // Tutup modal secara mulus
+                    setTimeout(() => {
+                        alertBoxG.className = 'd-none';
+                        bootstrap.Modal.getInstance(document.getElementById('modalGantiPasswordGlobal')).hide();
+                    }, 1500);
+
+                } else {
+                    // Tampilkan Error (Misal: Sandi lama keliru)
+                    alertBoxG.className = 'alert alert-danger rounded-3 small fw-bold mb-3';
+                    alertBoxG.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-2 text-danger fs-5 align-middle"></i> ${data.message}`;
+                    btnSimpanG.innerHTML = originalText;
+                    btnSimpanG.disabled = false;
+                    oldPassG.value = '';
+                    oldPassG.focus();
+                }
+            } catch (error) {
+                alertBoxG.className = 'alert alert-warning rounded-3 small fw-bold mb-3';
+                alertBoxG.innerHTML = `<i class="bi bi-wifi-off me-2 text-warning fs-5 align-middle"></i> Jaringan gagal merespon. Coba beberapa saat lagi.`;
+                btnSimpanG.innerHTML = originalText;
+                btnSimpanG.disabled = false;
+            }
         });
     });
-  }
-</script>
+    </script>
 </body>
 </html>
