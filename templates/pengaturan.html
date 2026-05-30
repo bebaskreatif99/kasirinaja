@@ -76,21 +76,27 @@
                 </div>
             </div>
 
-            <div class="card border-0 shadow-sm rounded-4">
+            <div class="card border-0 shadow-sm rounded-4 border-start border-primary border-4">
                 <div class="card-header bg-white border-bottom-0 pt-4 pb-0 px-4">
-                    <h5 class="fw-bold mb-0"><i class="bi bi-printer text-danger me-2"></i>Perangkat Printer</h5>
+                    <h5 class="fw-bold mb-0"><i class="bi bi-printer text-primary me-2"></i>Perangkat Printer</h5>
                 </div>
                 <div class="card-body p-4">
-                    <label class="form-label fw-semibold small text-muted">Pilih Printer Thermal</label>
+                    <p class="text-muted small mb-3">Hubungkan printer thermal Bluetooth Anda di sini. Koneksi akan dijaga persisten oleh sistem.</p>
+                    
                     <div class="d-flex gap-2 mb-3">
-                        <select id="printerDevice" class="form-select rounded-3 bg-light w-100">
-                            <option value="">Tidak ada printer (PDF Only)</option>
-                            <option value="BT-Printer-58mm" {% if setting.printer == 'BT-Printer-58mm' %}selected{% endif %}>Bluetooth Printer 58mm</option>
-                            <option value="USB-POS-80mm" {% if setting.printer == 'USB-POS-80mm' %}selected{% endif %}>USB POS Printer 80mm</option>
-                        </select>
-                        <button type="button" class="btn btn-outline-danger rounded-3" title="Refresh"><i class="bi bi-arrow-clockwise"></i></button>
+                        <button type="button" class="btn btn-primary fw-bold flex-grow-1" id="btnConnectBT"><i class="bi bi-bluetooth me-2"></i>Hubungkan</button>
+                        <button type="button" class="btn btn-outline-danger fw-bold" id="btnDisconnectBT" title="Putuskan"><i class="bi bi-power"></i></button>
                     </div>
-                    <button type="button" class="btn btn-light border w-100 fw-semibold shadow-sm text-dark" onclick="testPrinter()"><i class="bi bi-file-earmark-text me-2"></i>Test Print</button>
+
+                    <div class="p-3 bg-light rounded-3 border d-flex align-items-center justify-content-between mb-3">
+                        <span class="small fw-bold text-muted">Status:</span>
+                        <div id="btStatusLabel" class="fw-black text-danger"><i class="bi bi-circle-fill small me-2"></i>Offline</div>
+                    </div>
+
+                    <div class="form-check form-switch p-3 bg-light rounded-3 d-flex align-items-center justify-content-between border">
+                        <label class="form-check-label fw-semibold text-dark mb-0" for="useBluetooth">Gunakan Printer Bluetooth</label>
+                        <input class="form-check-input fs-4 m-0 shadow-none cursor-pointer" type="checkbox" role="switch" id="useBluetooth" {% if setting.printer == 'BT-Printer-58mm' %}checked{% endif %} onchange="handleSave(true)">
+                    </div>
                 </div>
             </div>
 
@@ -119,6 +125,9 @@
 </form>
 
 <script>
+    // ==========================================
+    // LOGIKA PENYIMPANAN DATA
+    // ==========================================
     function handleSave(isAutoSave = false) {
         const btnHeader = document.getElementById('btnSaveHeader');
         const btnMobile = document.getElementById('btnSaveMobile');
@@ -139,7 +148,7 @@
             pajak_pb1: parseInt(document.getElementById('pajakPb1').value) || 0,
             service_charge: parseInt(document.getElementById('serviceCharge').value) || 0,
             is_tax_included: document.getElementById('pajakTermasuk').checked ? 1 : 0,
-            printer: document.getElementById('printerDevice').value,
+            printer: document.getElementById('useBluetooth').checked ? 'BT-Printer-58mm' : '', // Sync dg kasir.html
             is_cash_active: document.getElementById('toggleTunai').checked ? 1 : 0,
             is_qris_active: document.getElementById('toggleQris').checked ? 1 : 0
         };
@@ -170,7 +179,7 @@
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('Gagal menyimpan pengaturan. Periksa koneksi Anda.');
+            if(!isAutoSave) alert('Gagal menyimpan pengaturan. Periksa koneksi Anda.');
             if (!isAutoSave) {
                 btnHeader.innerHTML = originalTextHeader; btnHeader.disabled = false;
                 if(btnMobile) { btnMobile.innerHTML = originalTextMobile; btnMobile.disabled = false; }
@@ -178,33 +187,61 @@
         });
     }
 
-    // LOGIKA MOCKUP PRINTER THERMAL
-    function testPrinter() {
-        const printer = document.getElementById('printerDevice').value;
-        const namaToko = document.getElementById('namaToko').value;
-        const alamat = document.getElementById('alamatToko').value;
-        const waktu = new Date().toLocaleString('id-ID');
+    // ==========================================
+    // LOGIKA KONEKSI GLOBAL PRINTER UI
+    // ==========================================
+    const btnConnect = document.getElementById('btnConnectBT');
+    const btnDisconnect = document.getElementById('btnDisconnectBT');
+    const statusLabel = document.getElementById('btStatusLabel');
 
-        if (!printer) {
-            alert('Silakan pilih perangkat printer terlebih dahulu!');
-            return;
+    function updateBTUI(connected, name) {
+        if(connected) {
+            statusLabel.innerHTML = `<i class="bi bi-circle-fill text-success small me-2"></i>Online (${name})`;
+            statusLabel.classList.replace('text-danger', 'text-success');
+            btnConnect.disabled = true; btnDisconnect.disabled = false;
+        } else {
+            statusLabel.innerHTML = `<i class="bi bi-circle-fill text-danger small me-2"></i>Offline`;
+            statusLabel.classList.replace('text-success', 'text-danger');
+            btnConnect.disabled = false; btnDisconnect.disabled = true;
         }
+    }
 
-        const dummyReceipt = `
-================================
-        ${namaToko.toUpperCase()}        
-================================
-${alamat}
-Waktu: ${waktu}
---------------------------------
-1x Test Print Menu     Rp 10.000
---------------------------------
-TOTAL                  Rp 10.000
-================================
-     STATUS: PRINT BERHASIL     
-================================`;
+    // Tangkap sinyal reaktif dari PrinterStore di layout.html
+    window.addEventListener('printerStatus', (e) => updateBTUI(e.detail.connected, e.detail.name));
+    
+    // Inisialisasi UI awal dengan pengecekan aman
+    if (window.PrinterStore) {
+        updateBTUI(window.PrinterStore.getStatus(), window.PrinterStore.getDeviceName());
+    }
 
-        alert(`Mencoba mengirim data ke [${printer}]...\n\nBerikut simulasi cetaknya:\n${dummyReceipt}`);
+    if (btnConnect) {
+        btnConnect.addEventListener('click', async () => {
+            if (!window.PrinterStore) return alert("Sistem Bluetooth belum termuat sepenuhnya. Coba refresh halaman.");
+            try {
+                btnConnect.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Memproses...`;
+                btnConnect.disabled = true;
+                await window.PrinterStore.connect();
+                // Otomatis nyalakan toggle "Gunakan Bluetooth" dan save background
+                document.getElementById('useBluetooth').checked = true;
+                handleSave(true);
+            } catch(e) {
+                alert("Gagal koneksi: " + e.message);
+            } finally {
+                btnConnect.innerHTML = `<i class="bi bi-bluetooth me-2"></i>Hubungkan`;
+                if (!window.PrinterStore.getStatus()) btnConnect.disabled = false;
+            }
+        });
+    }
+
+    if (btnDisconnect) {
+        btnDisconnect.addEventListener('click', () => {
+            if (window.PrinterStore) {
+                window.PrinterStore.disconnect();
+                // Jika diputus manual, sekalian matikan toggle agar beralih ke mode PDF
+                document.getElementById('useBluetooth').checked = false;
+                handleSave(true);
+            }
+        });
     }
 </script>
 

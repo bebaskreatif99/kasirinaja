@@ -1,3 +1,10 @@
+Sebagai Senior Frontend Web Developer, saya telah menyesuaikan kode `kasir.html` Anda. Saya mengganti sistem Bluetooth lokal yang lama dengan menjadikannya sebagai "Consumer" (Pengguna) dari `window.PrinterStore` yang sudah kita buat di `layout.html`.
+
+Sekarang, halaman Mesin Kasir tidak akan pernah memunculkan *pop-up* izin *pairing* lagi. Ia hanya akan mengandalkan koneksi persisten di *background*, dan tombol Bluetooth di atas hanya berfungsi sebagai indikator visual cerdas (berwarna biru jika terhubung, abu-abu jika offline).
+
+Berikut adalah **FULL CODE** untuk file **`templates/kasir.html`** yang terbaru. Silakan *copy-paste* menimpa file asli Anda:
+
+```html
 {% extends 'layout.html' %}
 {% block content %}
 
@@ -45,15 +52,9 @@
                 <input type="text" id="inputPencarian" class="form-control border-0 py-3 shadow-none fw-semibold" placeholder="Cari menu ayam, kopi, dsb..." onkeyup="UI.filterKatalog()">
             </div>
             
-            {% if setting and setting.printer == 'BT-Printer-58mm' %}
-            <button id="btnBT" class="btn btn-white bg-white rounded-circle shadow-sm flex-shrink-0 transition-hover" style="width: 56px;" onclick="PrinterService.connect()" title="Koneksi Printer Bluetooth">
-                <i class="bi bi-bluetooth text-primary fs-4"></i>
+            <button id="btnBTIndicator" class="btn btn-white bg-white rounded-circle shadow-sm flex-shrink-0" style="width: 56px;" title="Status Printer Bluetooth">
+                <i id="iconBT" class="bi bi-bluetooth text-muted fs-4 transition-hover"></i>
             </button>
-            {% else %}
-            <button id="btnBT" class="btn btn-light rounded-circle shadow-sm flex-shrink-0 opacity-50" style="width: 56px;" title="Mode PDF Aktif (Bluetooth Dimatikan di Pengaturan Toko)" disabled>
-                <i class="bi bi-bluetooth text-muted fs-4"></i>
-            </button>
-            {% endif %}
         </div>
 
         <div class="d-flex overflow-auto hide-scroll gap-2 mb-4 pb-2">
@@ -443,72 +444,22 @@
     };
 
     // ==========================================
-    // 4. PRINTER SERVICE (IoT BLUETOOTH ESC/POS)
+    // 4. SEAMLESS PRINTING CLIENT (KONSUMEN GLOBAL STORE)
     // ==========================================
     const PrinterService = {
-        device: null,
-        server: null,
-        writeCharacteristic: null,
-
-        async connect() {
-            try {
-                console.log("🔍 [1/4] Meminta akses perangkat Bluetooth...");
-                // Note: Sesuaikan/Tambahkan Service UUID jika printer Anda menggunakan UUID standar lain
-                this.device = await navigator.bluetooth.requestDevice({
-                    filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }],
-                    optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
-                });
-                console.log(`✅ Perangkat dipilih: ${this.device.name}`);
-
-                console.log("🔄 [2/4] Menghubungkan ke GATT Server...");
-                this.server = await this.device.gatt.connect();
-                console.log("✅ GATT Server terhubung.");
-
-                console.log("🔍 [3/4] Mengambil Primary Service...");
-                const service = await this.server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
-                console.log("✅ Service valid ditemukan.");
-
-                console.log("🔍 [4/4] Memindai Characteristic untuk jalur Tulis (Write)...");
-                const characteristics = await service.getCharacteristics();
-                
-                // Looping pintar untuk mencari Characteristic yang tidak di-lock (Bisa ditulis)
-                for (const char of characteristics) {
-                    console.log(`  -> Mengecek UUID: ${char.uuid} | Read: ${char.properties.read} | Write: ${char.properties.write} | WriteWoRes: ${char.properties.writeWithoutResponse}`);
-                    
-                    if (char.properties.write || char.properties.writeWithoutResponse) {
-                        this.writeCharacteristic = char;
-                        console.log(`🎯 TARGET KUNCI DITEMUKAN! Menggunakan Characteristic: ${char.uuid}`);
-                        break; 
-                    }
-                }
-
-                if (!this.writeCharacteristic) {
-                    throw new Error("❌ Printer ini menolak akses tulis. Tidak ada Characteristic yang valid.");
-                }
-
-                document.getElementById('btnBT').innerHTML = `<i class="bi bi-bluetooth text-success fs-4"></i>`;
-                alert("Perangkat Thermal sukses terhubung dan jalur cetak terbuka!");
-
-            } catch(e) { 
-                console.error("🔥 ERROR BLUETOOTH CONNECT:", e);
-                alert("Koneksi gagal atau dibatalkan. Cek Console untuk detail log."); 
-            }
-        },
-
         async print() {
-            // Fallback ke PDF/Web Print jika Bluetooth tidak aktif
-            if (!this.writeCharacteristic) {
-                console.warn("⚠️ Printer fisik tidak terdeteksi. Membuka mode cetak web/PDF...");
+            // Cek ke Global State (Store) di layout.html
+            if (!window.PrinterStore || !window.PrinterStore.getStatus()) {
+                alert("📴 Printer belum terhubung! Silakan buka menu 'Pengaturan Toko' untuk menyambungkan printer Bluetooth Anda.");
+                // Fallback cetak via browser/PDF
                 window.open('/cetak_struk/' + State.lastTrxId, '_blank');
                 return;
             }
 
             try {
-                console.log("🖨️ --- MEMULAI PROSES CETAK ESC/POS ---");
+                console.log("🖨️ Mengirim data ke Global Printer Store...");
                 
-                // 1. GENERATE TEKS STRUK DARI STATE LOKAL KASIR
-                // Mengambil nama toko dan kontak dari elemen UI navigasi/setting jika ada, 
-                // atau gunakan teks statis jika tidak tersedia.
+                // GENERATE TEKS STRUK DARI STATE LOKAL KASIR
                 const namaToko = document.querySelector('.logo-text')?.innerText || "KASIRINAJA";
                 const waktu = new Date().toLocaleString('id-ID');
                 
@@ -532,65 +483,69 @@
                 textStruk += `================================\n`;
                 textStruk += `     TERIMA KASIH     \n\n`;
 
-                console.log("📝 Draft Teks Struk Selesai Dibuat.");
-
-                // 2. PERSIAPAN BYTE ESC/POS (HARDWARE COMMANDS)
-                const INIT_PRINTER = new Uint8Array([0x1B, 0x40]); // Initialize
-                const FEED_PAPER = new Uint8Array([0x0A, 0x0A, 0x0A, 0x0A]); // 4x Line Feed agar tidak nyangkut
-
-                // 3. ENCODE STRING KE BYTE ARRAY
+                // ENCODE STRING KE BYTE ARRAY DAN CHUNKING DITANGANI OLEH GLOBAL STORE
                 const encoder = new TextEncoder();
                 const textBytes = encoder.encode(textStruk);
-                console.log(`📏 Ukuran data teks murni: ${textBytes.length} bytes`);
-
-                // 4. MERGE (GABUNGKAN) INIT + TEKS + FEED KE DALAM SATU BUFFER
-                const totalLength = INIT_PRINTER.length + textBytes.length + FEED_PAPER.length;
-                const finalData = new Uint8Array(totalLength);
                 
+                const INIT_PRINTER = new Uint8Array([0x1B, 0x40]); 
+                const FEED_PAPER = new Uint8Array([0x0A, 0x0A, 0x0A, 0x0A]); 
+
+                const finalData = new Uint8Array(INIT_PRINTER.length + textBytes.length + FEED_PAPER.length);
                 finalData.set(INIT_PRINTER, 0);
                 finalData.set(textBytes, INIT_PRINTER.length);
                 finalData.set(FEED_PAPER, INIT_PRINTER.length + textBytes.length);
-                
-                console.log(`📦 Total payload siap kirim: ${finalData.length} bytes`);
 
-                // 5. CHUNKING DATA (POTONG 512 BYTES) UNTUK MENCEGAH BUFFER OVERFLOW
-                const CHUNK_SIZE = 512;
-                let offset = 0;
-
-                while (offset < finalData.length) {
-                    const end = Math.min(offset + CHUNK_SIZE, finalData.length);
-                    const chunk = finalData.slice(offset, end);
-                    
-                    console.log(`📤 Mengirim Chunk: Byte ${offset} s/d ${end} (${chunk.length} bytes)`);
-                    
-                    if (this.writeCharacteristic.properties.writeWithoutResponse) {
-                        await this.writeCharacteristic.writeValueWithoutResponse(chunk);
-                    } else {
-                        await this.writeCharacteristic.writeValue(chunk);
-                    }
-                    
-                    offset = end;
-                    
-                    // Jeda 50ms per potongan agar prosesor printer murah sempat bernapas
-                    await new Promise(resolve => setTimeout(resolve, 50)); 
-                }
-
-                console.log("✅ --- CETAK BERHASIL TANPA CRASH ---");
-
+                // Kirim Payload ke Global Store
+                await window.PrinterStore.print(finalData);
+                console.log("✅ Cetak sukses via Global Store.");
             } catch (e) {
                 console.error("🔥 ERROR PROSES CETAK:", e);
-                alert("Koneksi printer terputus saat mencetak. Cek baterai atau dekatkan perangkat.");
+                alert("Gagal mencetak: " + e.message);
             }
         }
     };
     
-    // INIT MATA-MATA SINYAL (AUTO SYNC)
+    // ==========================================
+    // 5. INITIALIZATION & EVENT LISTENERS
+    // ==========================================
+    
+    // Sinkronisasi Ikon Header dengan Global State
+    window.addEventListener('printerStatus', (e) => {
+        const icon = document.getElementById('iconBT');
+        const btnIndicator = document.getElementById('btnBTIndicator');
+        if(icon && btnIndicator) {
+            if(e.detail.connected) {
+                icon.classList.replace('text-muted', 'text-primary');
+                btnIndicator.title = `Terhubung: ${e.detail.name}`;
+            } else {
+                icon.classList.replace('text-primary', 'text-muted');
+                btnIndicator.title = "Printer Offline";
+            }
+        }
+    });
+
     window.addEventListener('online', () => { 
         document.getElementById('offlineBanner').classList.remove('show'); 
         API.sync(); 
     });
+    
     window.addEventListener('offline', () => document.getElementById('offlineBanner').classList.add('show'));
-    window.onload = () => { UI.render(); API.sync(); };
+    
+    window.onload = () => { 
+        UI.render(); 
+        API.sync(); 
+        
+        // Trigger event UI awal dari Global Store
+        if(window.PrinterStore && window.PrinterStore.getStatus()){
+            const icon = document.getElementById('iconBT');
+            if(icon) {
+                icon.classList.replace('text-muted', 'text-primary');
+                document.getElementById('btnBTIndicator').title = `Terhubung: ${window.PrinterStore.getDeviceName()}`;
+            }
+        }
+    };
 </script>
 
 {% endblock %}
+
+```
