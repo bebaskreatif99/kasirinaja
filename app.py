@@ -10,6 +10,13 @@ from flask_limiter.util import get_remote_address
 import psycopg2
 from psycopg2.extras import DictCursor
 
+# Load dotenv untuk environment lokal VS Code (Aman diabaikan oleh Vercel)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 app = Flask(__name__)
 app.secret_key = 'kasirinaja_saas_super_secret_2026' 
 
@@ -46,8 +53,6 @@ def init_db():
     cur.execute('''CREATE TABLE IF NOT EXISTS donasi_pendaftaran (
         id SERIAL PRIMARY KEY, nama TEXT, email TEXT, whatsapp TEXT, kode_donasi TEXT, 
         status TEXT, nominal INTEGER DEFAULT 0, created_at TEXT)''')
-    
-    # BAGIAN TRY-EXCEPT ALTER TABLE SUDAH DIHAPUS DARI SINI
 
     cur.execute('''CREATE TABLE IF NOT EXISTS produk (
         id SERIAL PRIMARY KEY, tenant_id INTEGER, sku TEXT, nama TEXT, harga INTEGER, harga_modal INTEGER, 
@@ -120,7 +125,6 @@ def setup():
 # ==========================================
 # RUTE APLIKASI SAAS
 # ==========================================
-# PERBAIKAN: Halaman utama kini adalah Landing Page
 @app.route('/')
 def landing():
     return render_template('landing.html')
@@ -248,7 +252,6 @@ def login():
 def logout():
     session.clear(); return redirect(url_for('login'))
 
-# PERBAIKAN: Mesin Kasir kini berada di rute /pos
 @app.route('/pos')
 @login_required
 def kasir():
@@ -256,8 +259,11 @@ def kasir():
     cur = conn.cursor(cursor_factory=DictCursor)
     cur.execute("SELECT * FROM produk WHERE tenant_id = %s AND status = 'Aktif'", (session['tenant_id'],))
     produk = cur.fetchall()
-    cur.execute('SELECT is_cash_active, is_qris_active FROM pengaturan WHERE tenant_id = %s', (session['tenant_id'],))
+    
+    # PERBAIKAN SINKRONISASI PRINTER: Memanggil field 'printer' dari database
+    cur.execute('SELECT is_cash_active, is_qris_active, printer FROM pengaturan WHERE tenant_id = %s', (session['tenant_id'],))
     setting = cur.fetchone()
+    
     cur.close(); conn.close()
     return render_template('kasir.html', menu=produk, setting=setting)
 
@@ -361,6 +367,35 @@ def pengaturan():
     cur.close(); conn.close()
     return render_template('pengaturan.html', setting=setting)
 
+# PERBAIKAN: Penambahan route /api/pengaturan yang esensial agar data dapat disimpan ke database
+@app.route('/api/pengaturan', methods=['POST'])
+@login_required
+def api_pengaturan():
+    data = request.get_json()
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute('''UPDATE pengaturan 
+                       SET nama_toko=%s, kontak=%s, alamat=%s, footer=%s, 
+                           pajak_pb1=%s, service_charge=%s, is_tax_included=%s, 
+                           printer=%s, is_cash_active=%s, is_qris_active=%s 
+                       WHERE tenant_id=%s''', 
+                    (data.get('nama_toko'), data.get('kontak'), data.get('alamat'), data.get('footer'),
+                     data.get('pajak_pb1'), data.get('service_charge'), data.get('is_tax_included'),
+                     data.get('printer'), data.get('is_cash_active'), data.get('is_qris_active'), session['tenant_id']))
+        
+        # Sinkronkan juga nama toko di tabel tenants jika user memperbaruinya
+        cur.execute('UPDATE tenants SET nama_toko=%s WHERE id=%s', (data.get('nama_toko'), session['tenant_id']))
+        
+        conn.commit()
+        return jsonify({"status": "success", "message": "Pengaturan disimpan"}), 200
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
 @app.route('/api/settings/change-password', methods=['POST'])
 @login_required
 def api_change_password():
@@ -368,27 +403,20 @@ def api_change_password():
     old_password = data.get('oldPassword')
     new_password = data.get('newPassword')
 
-    # Validasi Lapis 1 (Backend)
     if not old_password or not new_password or len(new_password) < 6:
         return jsonify({"status": "error", "message": "Password baru harus minimal 6 karakter!"}), 400
 
     conn = get_db_connection()
     try:
-        # PENTING: PostgreSQL menggunakan Cursor dan DictCursor
         cur = conn.cursor(cursor_factory=DictCursor)
-        
-        # PENTING: PostgreSQL menggunakan %s bukan ?
         cur.execute('SELECT password FROM users WHERE id = %s', (session['user_id'],))
         user = cur.fetchone()
         
-        # Cek kecocokan password lama
         if not user or not check_password_hash(user['password'], old_password):
             return jsonify({"status": "error", "message": "Password lama yang Anda masukkan salah!"}), 401
             
-        # Hashing password baru
         hashed_new_password = generate_password_hash(new_password)
         
-        # Simpan ke Database PostgreSQL (Pakai %s)
         cur.execute('UPDATE users SET password = %s WHERE id = %s', (hashed_new_password, session['user_id']))
         conn.commit()
         
@@ -396,7 +424,6 @@ def api_change_password():
         
     except Exception as e:
         conn.rollback()
-        # Cetak error ke log Vercel agar mudah di-debug
         print(f"🔥 ERROR GANTI PASSWORD (POSTGRES): {str(e)}")
         return jsonify({"status": "error", "message": f"Sistem Error: {str(e)}"}), 500
     finally:
