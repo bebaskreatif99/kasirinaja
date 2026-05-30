@@ -306,6 +306,101 @@
     </script>
 
     <script>
+    window.PrinterStore = (function() {
+        let device = null;
+        let server = null;
+        let charWrite = null;
+        let isConnected = false;
+
+        function dispatchStatus() {
+            window.dispatchEvent(new CustomEvent('printerStatus', {
+                detail: { connected: isConnected, name: device ? device.name : '' }
+            }));
+        }
+
+        async function initGATT(btDevice) {
+            device = btDevice;
+            device.addEventListener('gattserverdisconnected', handleDisconnect);
+            
+            server = await device.gatt.connect();
+            const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+            const chars = await service.getCharacteristics();
+            
+            for (const c of chars) {
+                if (c.properties.write || c.properties.writeWithoutResponse) {
+                    charWrite = c; break;
+                }
+            }
+            if (!charWrite) throw new Error("Tidak ada akses Write pada printer ini.");
+            isConnected = true;
+            dispatchStatus();
+        }
+
+        async function connect() {
+            const btDevice = await navigator.bluetooth.requestDevice({
+                filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }]
+            });
+            await initGATT(btDevice);
+        }
+
+        async function autoConnect() {
+            if (navigator.bluetooth && navigator.bluetooth.getDevices) {
+                try {
+                    const devices = await navigator.bluetooth.getDevices();
+                    if (devices.length > 0) {
+                        console.log("♻️ Memulihkan koneksi printer (Keep-Alive)...");
+                        await initGATT(devices[0]);
+                    }
+                } catch(e) { console.warn("Auto-connect background gagal:", e); }
+            }
+        }
+
+        function handleDisconnect() {
+            isConnected = false; charWrite = null; dispatchStatus();
+            console.warn("⚠️ Printer terputus! Mencoba auto-reconnect dalam 3 detik...");
+            setTimeout(async () => {
+                if (device) {
+                    try { await initGATT(device); console.log("✅ Auto-reconnect sukses!"); }
+                    catch(e) { console.error("Auto-reconnect gagal", e); }
+                }
+            }, 3000);
+        }
+
+        function disconnect() {
+            if (device && device.gatt.connected) device.gatt.disconnect();
+            device = null; server = null; charWrite = null; isConnected = false;
+            dispatchStatus();
+        }
+
+        async function print(escposData) {
+            if (!isConnected || !charWrite) throw new Error("Printer belum terhubung! Silakan setel di menu Pengaturan.");
+            const CHUNK_SIZE = 512;
+            let offset = 0;
+            while (offset < escposData.length) {
+                const chunk = escposData.slice(offset, Math.min(offset + CHUNK_SIZE, escposData.length));
+                if (charWrite.properties.writeWithoutResponse) {
+                    await charWrite.writeValueWithoutResponse(chunk);
+                } else {
+                    await charWrite.writeValue(chunk);
+                }
+                offset += CHUNK_SIZE;
+                await new Promise(r => setTimeout(r, 50));
+            }
+        }
+
+        window.addEventListener('load', autoConnect);
+
+        return { 
+            connect, 
+            disconnect, 
+            print, 
+            getStatus: () => isConnected, 
+            getDeviceName: () => device ? device.name : '' 
+        };
+    })();
+    </script>
+
+    <script>
     document.addEventListener("DOMContentLoaded", function() {
         const formG = document.getElementById('formGantiPasswordGlobal');
         const oldPassG = document.getElementById('gOldPassword');
@@ -315,7 +410,6 @@
         const matchErrorG = document.getElementById('gPassMatchError');
         const alertBoxG = document.getElementById('globalPassAlertBox');
 
-        // 1. Toggle Show/Hide Mata
         document.querySelectorAll('.toggle-gpass').forEach(btn => {
             btn.addEventListener('click', function() {
                 const input = this.previousElementSibling;
@@ -330,7 +424,6 @@
             });
         });
 
-        // 2. Validasi Keamanan (Cegah Spasi Kosong & Real-time Matching)
         function validateGlobalPasswordForm() {
             const oldVal = oldPassG.value.trim();
             const newVal = newPassG.value.trim();
@@ -347,7 +440,6 @@
                 confPassG.classList.remove('is-invalid');
             }
 
-            // Kunci tombol sampai semua syarat valid
             btnSimpanG.disabled = !(isFilled && isMatch);
         }
 
@@ -357,7 +449,6 @@
             confPassG.addEventListener(evt, validateGlobalPasswordForm);
         });
 
-        // Bersihkan data otomatis jika user klik (X) untuk tutup modal
         document.getElementById('modalGantiPasswordGlobal').addEventListener('hidden.bs.modal', function () {
             formG.reset();
             alertBoxG.className = 'd-none';
@@ -366,14 +457,12 @@
             validateGlobalPasswordForm();
         });
 
-        // 3. Eksekusi Pengiriman API (Fetch)
         formG.addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            // Lapis keamanan ekstra mencegah bypass submit kosong
             if (!oldPassG.value.trim() || !newPassG.value.trim()) {
-                alertBoxG.className = 'alert alert-warning rounded-3 small fw-bold mb-3';
-                alertBoxG.innerHTML = `<i class="bi bi-shield-fill-exclamation me-2"></i> Kolom tidak boleh hanya berisi spasi kosong!`;
+                alertBoxG.className = 'alert alert-warning rounded-3 small fw-bold mb-3 animate-bounce';
+                alertBoxG.innerHTML = `<i class="bi bi-shield-fill-exclamation me-2"></i> Kolom tidak boleh hanya berisi spasi!`;
                 return;
             }
 
@@ -400,14 +489,12 @@
                     formG.reset();
                     validateGlobalPasswordForm();
 
-                    // Tutup modal secara mulus
                     setTimeout(() => {
                         alertBoxG.className = 'd-none';
                         bootstrap.Modal.getInstance(document.getElementById('modalGantiPasswordGlobal')).hide();
                     }, 1500);
 
                 } else {
-                    // Tampilkan Error (Misal: Sandi lama keliru)
                     alertBoxG.className = 'alert alert-danger rounded-3 small fw-bold mb-3';
                     alertBoxG.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-2 text-danger fs-5 align-middle"></i> ${data.message}`;
                     btnSimpanG.innerHTML = originalText;
