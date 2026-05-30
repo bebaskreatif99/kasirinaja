@@ -15,7 +15,7 @@
     <div class="row g-4">
         
         <div class="col-lg-7">
-            <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card border-0 shadow-sm rounded-4 h-100 mb-4">
                 <div class="card-header bg-white border-bottom-0 pt-4 pb-0 px-4">
                     <h5 class="fw-bold mb-0"><i class="bi bi-receipt text-danger me-2"></i>Informasi Struk</h5>
                     <p class="text-muted small mt-1">Data ini akan tercetak di bagian atas dan bawah struk pelanggan.</p>
@@ -40,6 +40,20 @@
                             <div class="form-text small">Gunakan \n untuk membuat baris baru.</div>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm rounded-4 border-start border-danger border-4">
+                <div class="card-header bg-white border-bottom-0 pt-4 pb-0 px-4">
+                    <h5 class="fw-bold mb-0"><i class="bi bi-shield-lock text-danger me-2"></i>Keamanan Akun</h5>
+                </div>
+                <div class="card-body p-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
+                    <div>
+                        <p class="text-muted small mb-0">Ubah password atau PIN kasir Anda secara berkala untuk mencegah akses yang tidak sah.</p>
+                    </div>
+                    <button type="button" class="btn btn-outline-danger fw-bold rounded-pill px-4 flex-shrink-0" data-bs-toggle="modal" data-bs-target="#modalGantiPassword">
+                        <i class="bi bi-key me-1"></i> Ganti Password
+                    </button>
                 </div>
             </div>
         </div>
@@ -118,22 +132,70 @@
     </div>
 </form>
 
+<div class="modal fade" id="modalGantiPassword" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 rounded-4 shadow-lg">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold"><i class="bi bi-shield-lock-fill text-danger me-2"></i>Ganti Keamanan (Password)</h5>
+                <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" id="btnCloseModalPass"></button>
+            </div>
+            <div class="modal-body p-4">
+                
+                <div id="passAlertBox" class="d-none alert rounded-3 small fw-semibold"></div>
+
+                <form id="formGantiPassword">
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">Password Lama</label>
+                        <div class="input-group">
+                            <input type="password" id="oldPassword" class="form-control shadow-none bg-light border-end-0" placeholder="Masukkan sandi saat ini" required>
+                            <button class="btn btn-light bg-light border border-start-0 toggle-pass" type="button" tabindex="-1"><i class="bi bi-eye-slash text-muted"></i></button>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">Password Baru</label>
+                        <div class="input-group">
+                            <input type="password" id="newPassword" class="form-control shadow-none bg-light border-end-0" placeholder="Minimal 6 karakter" required minlength="6">
+                            <button class="btn btn-light bg-light border border-start-0 toggle-pass" type="button" tabindex="-1"><i class="bi bi-eye-slash text-muted"></i></button>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label text-muted small fw-bold">Ulangi Password Baru</label>
+                        <div class="input-group">
+                            <input type="password" id="confirmPassword" class="form-control shadow-none bg-light border-end-0" placeholder="Ketik ulang sandi baru" required>
+                            <button class="btn btn-light bg-light border border-start-0 toggle-pass" type="button" tabindex="-1"><i class="bi bi-eye-slash text-muted"></i></button>
+                        </div>
+                        <div id="passMatchError" class="text-danger small mt-1 d-none fw-semibold">
+                            <i class="bi bi-exclamation-circle me-1"></i>Password baru dan konfirmasi tidak cocok!
+                        </div>
+                    </div>
+
+                    <button type="submit" id="btnSimpanPassword" class="btn btn-danger w-100 fw-bold py-3 rounded-pill transition-hover" disabled>
+                        Simpan Perubahan Keamanan <i class="bi bi-check2-circle ms-1"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
-    // 1. LOGIKA MENYIMPAN FORM (STATE MANAGEMENT FETCH API)
+    // ==========================================
+    // 1. LOGIKA MENYIMPAN FORM PENGATURAN (ASLI)
+    // ==========================================
     function handleSave(isAutoSave = false) {
         const btnHeader = document.getElementById('btnSaveHeader');
         const btnMobile = document.getElementById('btnSaveMobile');
         const originalTextHeader = btnHeader.innerHTML;
         const originalTextMobile = btnMobile ? btnMobile.innerHTML : '';
         
-        // Visual Loading (jangan ubah jika ini auto-save dari toggle)
         if (!isAutoSave) {
             btnHeader.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Menyimpan...';
             btnHeader.disabled = true;
             if (btnMobile) { btnMobile.innerHTML = 'Menyimpan...'; btnMobile.disabled = true; }
         }
 
-        // Kumpulkan Data Form
         const payload = {
             nama_toko: document.getElementById('namaToko').value,
             kontak: document.getElementById('kontakToko').value,
@@ -147,7 +209,6 @@
             is_qris_active: document.getElementById('toggleQris').checked ? 1 : 0
         };
 
-        // Kirim ke Backend via API
         fetch('/api/pengaturan', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -156,7 +217,6 @@
         .then(response => response.json())
         .then(data => {
             if (!isAutoSave) {
-                // Notifikasi Sukses
                 btnHeader.innerHTML = '<i class="bi bi-check-circle me-2"></i>Tersimpan';
                 btnHeader.classList.replace('btn-danger', 'btn-success');
                 if (btnMobile) { btnMobile.innerHTML = 'TERSIMPAN'; btnMobile.classList.replace('btn-danger', 'btn-success'); }
@@ -165,7 +225,6 @@
                     btnHeader.innerHTML = originalTextHeader;
                     btnHeader.classList.replace('btn-success', 'btn-danger');
                     btnHeader.disabled = false;
-                    
                     if (btnMobile) {
                         btnMobile.innerHTML = originalTextMobile;
                         btnMobile.classList.replace('btn-success', 'btn-danger');
@@ -184,7 +243,9 @@
         });
     }
 
-    // 2. LOGIKA MOCKUP PRINTER THERMAL
+    // ==========================================
+    // 2. LOGIKA MOCKUP PRINTER THERMAL (ASLI)
+    // ==========================================
     function testPrinter() {
         const printer = document.getElementById('printerDevice').value;
         const namaToko = document.getElementById('namaToko').value;
@@ -196,7 +257,6 @@
             return;
         }
 
-        // Mockup Struk yang dikirim ke driver printer
         const dummyReceipt = `
 ================================
         ${namaToko.toUpperCase()}        
@@ -209,12 +269,113 @@ Waktu: ${waktu}
 TOTAL                  Rp 10.000
 ================================
      STATUS: PRINT BERHASIL     
-================================
-        `;
+================================`;
 
-        // Simulasi pengiriman via alert
         alert(`Mencoba mengirim data ke [${printer}]...\n\nBerikut simulasi cetaknya:\n${dummyReceipt}`);
     }
+
+    // ========================================================
+    // 3. LOGIKA BARU: VALIDASI & API GANTI PASSWORD (UX AMAN)
+    // ========================================================
+    document.addEventListener("DOMContentLoaded", function() {
+        const formPass = document.getElementById('formGantiPassword');
+        const oldPass = document.getElementById('oldPassword');
+        const newPass = document.getElementById('newPassword');
+        const confPass = document.getElementById('confirmPassword');
+        const btnSimpanPass = document.getElementById('btnSimpanPassword');
+        const matchError = document.getElementById('passMatchError');
+        const alertBox = document.getElementById('passAlertBox');
+
+        // Toggle Show/Hide Password
+        document.querySelectorAll('.toggle-pass').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const input = this.previousElementSibling;
+                const icon = this.querySelector('i');
+                if (input.type === "password") {
+                    input.type = "text";
+                    icon.classList.replace('bi-eye-slash', 'bi-eye');
+                } else {
+                    input.type = "password";
+                    icon.classList.replace('bi-eye', 'bi-eye-slash');
+                }
+            });
+        });
+
+        // Validasi State Real-Time
+        function validatePasswordForm() {
+            const isFilled = oldPass.value.length > 0 && newPass.value.length >= 6 && confPass.value.length > 0;
+            const isMatch = newPass.value === confPass.value;
+
+            if (confPass.value.length > 0 && !isMatch) {
+                matchError.classList.remove('d-none');
+                confPass.classList.add('is-invalid');
+            } else {
+                matchError.classList.add('d-none');
+                confPass.classList.remove('is-invalid');
+            }
+
+            // Kunci tombol jika kosong atau tidak cocok
+            btnSimpanPass.disabled = !(isFilled && isMatch);
+        }
+
+        ['input', 'keyup', 'change'].forEach(evt => {
+            oldPass.addEventListener(evt, validatePasswordForm);
+            newPass.addEventListener(evt, validatePasswordForm);
+            confPass.addEventListener(evt, validatePasswordForm);
+        });
+
+        // Submit API Fetch
+        formPass.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const originalBtnText = btnSimpanPass.innerHTML;
+            btnSimpanPass.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Memvalidasi...`;
+            btnSimpanPass.disabled = true;
+            alertBox.className = 'd-none'; // Sembunyikan notifikasi sebelumnya
+
+            try {
+                const response = await fetch('/api/settings/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        oldPassword: oldPass.value,
+                        newPassword: newPass.value
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.status === 'success') {
+                    // Berhasil
+                    alertBox.className = 'alert alert-success rounded-3 small fw-bold mb-4';
+                    alertBox.innerHTML = `<i class="bi bi-check-circle-fill me-2 fs-5 align-middle"></i>${data.message}`;
+                    
+                    formPass.reset();
+                    validatePasswordForm(); 
+
+                    // Auto-close modal setelah 1.5 detik
+                    setTimeout(() => {
+                        alertBox.className = 'd-none';
+                        bootstrap.Modal.getInstance(document.getElementById('modalGantiPassword')).hide();
+                    }, 1500);
+                } else {
+                    // Gagal (Cth: Password Lama Salah)
+                    alertBox.className = 'alert alert-danger rounded-3 small fw-bold mb-4 fade-in';
+                    alertBox.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-2 fs-5 align-middle"></i>${data.message}`;
+                    oldPass.value = ''; // Kosongkan agar bisa diisi ulang
+                    oldPass.focus();
+                }
+            } catch (error) {
+                alertBox.className = 'alert alert-warning rounded-3 small fw-bold mb-4';
+                alertBox.innerHTML = `<i class="bi bi-wifi-off me-2 fs-5 align-middle"></i>Koneksi ke server terputus.`;
+            } finally {
+                if(alertBox.classList.contains('alert-danger') || alertBox.classList.contains('alert-warning')){
+                    btnSimpanPass.innerHTML = originalBtnText;
+                    btnSimpanPass.disabled = false;
+                }
+            }
+        });
+    });
 </script>
 
 {% endblock %}
