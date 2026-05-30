@@ -1,10 +1,3 @@
-Sebagai Senior Frontend Web Developer, saya telah menyesuaikan kode `kasir.html` Anda. Saya mengganti sistem Bluetooth lokal yang lama dengan menjadikannya sebagai "Consumer" (Pengguna) dari `window.PrinterStore` yang sudah kita buat di `layout.html`.
-
-Sekarang, halaman Mesin Kasir tidak akan pernah memunculkan *pop-up* izin *pairing* lagi. Ia hanya akan mengandalkan koneksi persisten di *background*, dan tombol Bluetooth di atas hanya berfungsi sebagai indikator visual cerdas (berwarna biru jika terhubung, abu-abu jika offline).
-
-Berikut adalah **FULL CODE** untuk file **`templates/kasir.html`** yang terbaru. Silakan *copy-paste* menimpa file asli Anda:
-
-```html
 {% extends 'layout.html' %}
 {% block content %}
 
@@ -547,5 +540,3 @@ Berikut adalah **FULL CODE** untuk file **`templates/kasir.html`** yang terbaru.
 </script>
 
 {% endblock %}
-
-```
