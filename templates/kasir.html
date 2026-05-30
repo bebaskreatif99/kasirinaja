@@ -276,25 +276,51 @@
         }
     };
 
-    // --- SEAMLESS PRINTING (MEMANGGIL GLOBAL STORE) ---
+    // --- SEAMLESS PRINTING (ANTI-POP-UP) ---
     const PrinterService = {
         async print() {
-            // Cek apakah Bluetooth direstui oleh Pengaturan Toko
             const isBTAktif = document.getElementById('btnBTIndicator') !== null;
             
             if (!isBTAktif) {
-                // Mode PDF / Cetak Web Normal
                 window.open('/cetak_struk/' + State.lastTrxId, '_blank');
                 return;
             }
 
             try {
-                const namaToko = document.querySelector('.logo-text')?.innerText || "KASIRINAJA";
+                // GENERATE TEKS STRUK SINKRON DENGAN DATABASE
+                const namaToko = {{ (setting.nama_toko if setting else 'KASIRINAJA') | tojson | safe }};
+                const alamatToko = {{ (setting.alamat if setting else '') | tojson | safe }};
+                const kontakToko = {{ (setting.kontak if setting else '') | tojson | safe }};
+                const footerStrukRaw = {{ (setting.footer if setting else 'TERIMA KASIH') | tojson | safe }};
                 const waktu = new Date().toLocaleString('id-ID');
                 
-                let textStruk = `\n     ${namaToko.toUpperCase()}     \n================================\nTanggal : ${waktu}\nNota ID : #${State.lastTrxId || '0000'}\n--------------------------------\n`;
-                State.cart.forEach(item => { textStruk += `${item.qty}x ${item.nama}\n    @ Rp${item.harga}     Rp${item.harga * item.qty}\n`; });
-                textStruk += `--------------------------------\nTOTAL     : Rp${State.totalFinal}\nDIBAYAR   : Rp${State.received}\nKEMBALI   : Rp${State.received - State.totalFinal}\n================================\n     TERIMA KASIH     \n\n`;
+                let textStruk = `\n     ${namaToko.toUpperCase()}     \n`;
+                if(alamatToko) textStruk += `     ${alamatToko}     \n`;
+                if(kontakToko) textStruk += `     Telp/WA: ${kontakToko}     \n`;
+                textStruk += `================================\n`;
+                textStruk += `Tanggal : ${waktu}\n`;
+                textStruk += `Nota ID : #${State.lastTrxId || '0000'}\n`;
+                textStruk += `--------------------------------\n`;
+                
+                State.cart.forEach(item => { 
+                    textStruk += `${item.qty}x ${item.nama}\n    @ Rp${item.harga}     Rp${item.harga * item.qty}\n`; 
+                });
+                
+                textStruk += `--------------------------------\n`;
+                textStruk += `Subtotal  : Rp${State.subtotal}\n`;
+                if(State.tax > 0) textStruk += `Pajak/Fee : Rp${State.tax}\n`;
+                textStruk += `TOTAL     : Rp${State.totalFinal}\n`;
+                textStruk += `DIBAYAR   : Rp${State.received}\n`;
+                textStruk += `KEMBALI   : Rp${State.received - State.totalFinal}\n`;
+                textStruk += `================================\n`;
+                
+                // Menangani baris baru (newline) dari input database dengan aman
+                const footerStruk = footerStrukRaw.replace(/\\r\\n|\\r|\\n/g, '\n');
+                const footerLines = footerStruk.split('\n');
+                footerLines.forEach(line => {
+                    if(line.trim()) textStruk += `     ${line.trim()}     \n`;
+                });
+                textStruk += `\n\n`;
 
                 const encoder = new TextEncoder();
                 const textBytes = encoder.encode(textStruk);
@@ -306,12 +332,16 @@
                 finalData.set(textBytes, INIT_PRINTER.length);
                 finalData.set(FEED_PAPER, INIT_PRINTER.length + textBytes.length);
 
-                // Kirim Payload ke Global Store (Store akan otomatis menyambungkan jika sempat diskonek)
-                await window.PrinterStore.print(finalData);
+                // Kirim Payload ke Global Store, JIKA putus maka akan throw error dan ditangkap ke blok "catch"
+                if (window.PrinterStore) {
+                    await window.PrinterStore.print(finalData);
+                } else {
+                    throw new Error("Store Not Loaded");
+                }
                 
             } catch (e) {
-                alert("Peringatan Cetak Bluetooth: " + e.message);
-                // Fallback aman jika alat rusak / mati
+                console.log("🔕 Pengalihan ke PDF (Silent Fallback): " + e.message);
+                // Terjadi pemutusan diam-diam (Silent Failover), Kasir tidak akan melihat popup error!
                 window.open('/cetak_struk/' + State.lastTrxId, '_blank');
             }
         }

@@ -289,7 +289,7 @@
                 if (!charWrite) throw new Error("Tidak ada akses Write.");
                 
                 isConnected = true;
-                localStorage.setItem('bt_paired', '1'); // Ingatan Abadi
+                localStorage.setItem('bt_paired', '1');
             } catch(e) {
                 isConnected = false;
                 throw e;
@@ -299,6 +299,7 @@
             }
         }
 
+        // HANYA dipanggil dari Pengaturan Toko (Saat klik tombol "Hubungkan")
         async function connect() {
             const btDevice = await navigator.bluetooth.requestDevice({
                 filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }]
@@ -307,19 +308,16 @@
         }
 
         async function autoConnect() {
-            // Hanya auto-connect jika sebelumnya sudah pernah pairing sukses
             if (localStorage.getItem('bt_paired') === '1' && navigator.bluetooth && navigator.bluetooth.getDevices) {
                 isConnecting = true; dispatchStatus();
                 try {
                     const devices = await navigator.bluetooth.getDevices();
                     if (devices.length > 0) {
-                        console.log("♻️ Auto-reconnect background...");
                         await initGATT(devices[0]);
                     } else {
                         isConnecting = false; dispatchStatus();
                     }
                 } catch(e) {
-                    console.warn("Auto-connect gagal:", e);
                     isConnecting = false; dispatchStatus();
                 }
             }
@@ -335,13 +333,14 @@
         }
 
         function disconnect() {
-            localStorage.removeItem('bt_paired'); // Hapus ingatan
+            localStorage.removeItem('bt_paired');
             if (device && device.gatt.connected) device.gatt.disconnect();
             device = null; server = null; charWrite = null; 
             isConnected = false; isConnecting = false;
             dispatchStatus();
         }
 
+        // FUNGSI INI KINI SENYAP (TIDAK MEMAKSA POP-UP)
         async function ensureConnection() {
             if (isConnected && charWrite) return true;
             
@@ -353,14 +352,13 @@
                     return true;
                 }
             }
-            // Jika memori kosong, paksa munculkan pop-up izin
-            await connect();
-            return true;
+            
+            // JANGAN PANGGIL connect() DI SINI. Jika gagal secara senyap, lemparkan error!
+            throw new Error("SilentReconnectFailed");
         }
 
         async function print(escposData) {
-            // Trik Cerdas: Jamin koneksi otomatis menyambung sebelum print!
-            await ensureConnection();
+            await ensureConnection(); // Akan melemparkan error "SilentReconnectFailed" jika gagal diam-diam
 
             const CHUNK_SIZE = 512;
             let offset = 0;
